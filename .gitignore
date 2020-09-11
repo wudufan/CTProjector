@@ -1,0 +1,4 @@
+/legacy
+/cuda/output
+.ipynb_checkpoints
+__pycache__
