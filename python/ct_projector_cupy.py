@@ -1,8 +1,8 @@
 from ctypes import *
 import os
+import cupy as cp
 import numpy as np
 import re
-import scipy.ndimage
 
 module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprojector.so'))
 
@@ -59,25 +59,18 @@ class ct_projector:
         batch, nx, ny, nz, nview will be automatically derived from the parameters. The projection size should be set by self.nu and self.nv
         '''
         
-        # make sure they are float32
-        img = img.astype(np.float32)
-        det_center = det_center.astype(np.float32)
-        det_u = det_u.astype(np.float32)
-        det_v = det_v.astype(np.float32)
-        src = src.astype(np.float32)
-        
         # projection of size 
-        prj = np.zeros([img.shape[0], det_center.shape[0], self.nv, self.nu], np.float32)
+        prj = cp.zeros([img.shape[0], det_center.shape[0], self.nv, self.nu], cp.float32)
         
-        module.cSiddonConeProjectionAbitrary.restype = c_int
+        module.cupySiddonConeProjectionAbitrary.restype = c_int
 
-        err = module.cSiddonConeProjectionAbitrary(
-            prj.ctypes.data_as(POINTER(c_float)), 
-            img.ctypes.data_as(POINTER(c_float)), 
-            det_center.ctypes.data_as(POINTER(c_float)), 
-            det_u.ctypes.data_as(POINTER(c_float)), 
-            det_v.ctypes.data_as(POINTER(c_float)), 
-            src.ctypes.data_as(POINTER(c_float)),
+        err = module.cupySiddonConeProjectionAbitrary(
+            c_void_p(prj.data.ptr), 
+            c_void_p(img.data.ptr), 
+            c_void_p(det_center.data.ptr), 
+            c_void_p(det_u.data.ptr), 
+            c_void_p(det_v.data.ptr), 
+            c_void_p(src.data.ptr),
             c_int(img.shape[0]), 
             c_int(img.shape[3]), c_int(img.shape[2]), c_int(img.shape[1]), 
             c_float(self.dx), c_float(self.dy), c_float(self.dz),
@@ -107,24 +100,19 @@ class ct_projector:
         '''
         
         # make sure they are float32
-        prj = prj.astype(np.float32)
-        det_center = det_center.astype(np.float32)
-        det_u = det_u.astype(np.float32)
-        det_v = det_v.astype(np.float32)
-        src = src.astype(np.float32)
         
         # projection of size 
-        img = np.zeros([prj.shape[0], self.nz, self.ny, self.nx], np.float32)
+        img = cp.zeros([prj.shape[0], self.nz, self.ny, self.nx], cp.float32)
         
-        module.cSiddonConeBackprojectionAbitrary.restype = c_int
+        module.cupySiddonConeBackprojectionAbitrary.restype = c_int
 
-        err = module.cSiddonConeBackprojectionAbitrary(
-            img.ctypes.data_as(POINTER(c_float)), 
-            prj.ctypes.data_as(POINTER(c_float)), 
-            det_center.ctypes.data_as(POINTER(c_float)), 
-            det_u.ctypes.data_as(POINTER(c_float)), 
-            det_v.ctypes.data_as(POINTER(c_float)), 
-            src.ctypes.data_as(POINTER(c_float)),
+        err = module.cupySiddonConeBackprojectionAbitrary(
+            c_void_p(img.data.ptr), 
+            c_void_p(prj.data.ptr), 
+            c_void_p(det_center.data.ptr), 
+            c_void_p(det_u.data.ptr), 
+            c_void_p(det_v.data.ptr), 
+            c_void_p(src.data.ptr),
             c_int(img.shape[0]), 
             c_int(img.shape[3]), c_int(img.shape[2]), c_int(img.shape[1]), 
             c_float(self.dx), c_float(self.dy), c_float(self.dz),

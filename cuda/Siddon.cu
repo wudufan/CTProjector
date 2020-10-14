@@ -167,8 +167,8 @@ __device__ float SiddonRayTracing(float* pPrj, const float* pImg, float3 src, fl
 	int move = 0;
 	bool isTracing = true;
 	float val = 0;
-	int nyz = grid.ny * grid.nz;
-	pImg += var.ng.x * nyz + var.ng.y * grid.nz + var.ng.z;
+	int nxy = grid.nx * grid.ny;
+	pImg += var.ng.z * nxy + var.ng.y * grid.nx + var.ng.x;
 
 	while (isTracing)
 	{
@@ -181,13 +181,13 @@ __device__ float SiddonRayTracing(float* pPrj, const float* pImg, float3 src, fl
 			if (var.isPositive.x == 1)
 			{
 				var.ng.x++;
-				move = nyz;
+				move = 1;
 				if (var.ng.x >= grid.nx) isTracing = false;
 			}
 			else
 			{
 				var.ng.x--;
-				move = -nyz;
+				move = -1;
 				if (var.ng.x < 0) isTracing = false;
 			}
 		}
@@ -198,13 +198,13 @@ __device__ float SiddonRayTracing(float* pPrj, const float* pImg, float3 src, fl
 			if (var.isPositive.y == 1)
 			{
 				var.ng.y++;
-				move = grid.nz;
+				move = grid.nx;
 				if (var.ng.y >= grid.ny) isTracing = false;
 			}
 			else
 			{
 				var.ng.y--;
-				move = -grid.nz;
+				move = -grid.nx;
 				if (var.ng.y < 0) isTracing = false;
 			}
 		}
@@ -215,13 +215,13 @@ __device__ float SiddonRayTracing(float* pPrj, const float* pImg, float3 src, fl
 			if (var.isPositive.z == 1)
 			{
 				var.ng.z++;
-				move = 1;
+				move = nxy;
 				if (var.ng.z >= grid.nz) isTracing = false;
 			}
 			else
 			{
 				var.ng.z--;
-				move = -1;
+				move = -nxy;
 				if (var.ng.z < 0) isTracing = false;
 			}
 		}
@@ -250,8 +250,8 @@ __device__ float SiddonRayTracingTransposeAtomicAdd(float* pImg, float val, floa
 
 	int move = 0;
 	bool isTracing = true;
-	int nyz = grid.ny * grid.nz;
-	pImg += var.ng.x * nyz + var.ng.y * grid.nz + var.ng.z;
+	int nxy = grid.nx * grid.ny;
+	pImg += var.ng.z * nxy + var.ng.y * grid.nx + var.ng.x;
 
 	while (isTracing)
 	{
@@ -264,13 +264,13 @@ __device__ float SiddonRayTracingTransposeAtomicAdd(float* pImg, float val, floa
 			if (var.isPositive.x == 1)
 			{
 				var.ng.x++;
-				move = nyz;
+				move = 1;
 				if (var.ng.x >= grid.nx) isTracing = false;
 			}
 			else
 			{
 				var.ng.x--;
-				move = -nyz;
+				move = -1;
 				if (var.ng.x < 0) isTracing = false;
 			}
 		}
@@ -281,13 +281,13 @@ __device__ float SiddonRayTracingTransposeAtomicAdd(float* pImg, float val, floa
 			if (var.isPositive.y == 1)
 			{
 				var.ng.y++;
-				move = grid.nz;
+				move = grid.nx;
 				if (var.ng.y >= grid.ny) isTracing = false;
 			}
 			else
 			{
 				var.ng.y--;
-				move = -grid.nz;
+				move = -grid.nx;
 				if (var.ng.y < 0) isTracing = false;
 			}
 		}
@@ -298,13 +298,13 @@ __device__ float SiddonRayTracingTransposeAtomicAdd(float* pImg, float val, floa
 			if (var.isPositive.z == 1)
 			{
 				var.ng.z++;
-				move = 1;
+				move = nxy;
 				if (var.ng.z >= grid.nz) isTracing = false;
 			}
 			else
 			{
 				var.ng.z--;
-				move = -1;
+				move = -nxy;
 				if (var.ng.z < 0) isTracing = false;
 			}
 		}

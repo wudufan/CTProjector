@@ -3,9 +3,9 @@ OUT = output
 
 all: $(objects)
 	cd ${OUT}; \
-	nvcc -v --shared $(objects) -o libprojector.so
+	nvcc -v --shared $(objects) --gpu-architecture=sm_70 -o libprojector.so
 
 %.o: %.cu
-	nvcc -O3 -v --gpu-architecture=sm_60 --compiler-options '-fPIC' -I.. -dc $< -o ${OUT}/$@
+	nvcc -O3 -v --gpu-architecture=sm_70 --compiler-options '-fPIC' -I.. -dc $< -o ${OUT}/$@
 
 $(shell mkdir -p $(OUT))
