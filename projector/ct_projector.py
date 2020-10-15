@@ -1,8 +1,6 @@
 from ctypes import *
 import os
 import numpy as np
-import re
-import scipy.ndimage
 import configparser
 
 module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprojector.so'))
@@ -45,6 +43,53 @@ class ct_projector:
         self.ny = int(self.ny)
         self.nz = int(self.nz)
     
+    def set_projector(self, projector, **kwargs):
+        self.projector = projector
+        self.fp_kwargs = kwargs
+    
+    def set_backprojector(self, backprojector, **kwargs):
+        self.backprojector = backprojector
+        self.bp_kwargs = kwargs
+    
+    def fp(self, img):
+        return self.projector(img, **(self.fp_kwargs))
+    
+    def bp(self, prj):
+        return self.backprojector(prj, **(self.bp_kwargs))
+    
+    def calc_projector_norm(self, weight = None, niter=10):
+        '''
+        Use power method to calculate the norm of the projector
+        '''
+        if weight is not None:
+            weight = cp.sqrt(weight)
+        else:
+            weight = 1
+        
+        x = cp.random.uniform(size = [1, self.nz, self.ny, self.nx], dtype=cp.float32)
+        x = x / cp.linalg.norm(x)
+
+        for i in range(niter):
+            print (i, end=',', flush=True)
+            fp = self.fp(x)
+            norm = cp.linalg.norm(fp)
+            x = self.bp(fp * weight)
+
+            x = x / cp.linalg.norm(x)
+        print ('')
+
+        return norm
+        
+    def calc_norm_img(self, weight = None):
+        '''
+        Calculate norm_img = A.T*w*A*1
+        '''
+        if weight is None:
+            weight = 1
+        
+        x = cp.ones([1, self.nz, self.ny, self.nx], dtype=cp.float32)
+        return self.bp(self.fp(x) * weight)
+
     def set_device(self, device):
         return module.SetDevice(c_int(device))
     
@@ -83,11 +128,11 @@ class ct_projector:
             det_u.ctypes.data_as(POINTER(c_float)), 
             det_v.ctypes.data_as(POINTER(c_float)), 
             src.ctypes.data_as(POINTER(c_float)),
-            c_int(img.shape[0]), 
-            c_int(img.shape[3]), c_int(img.shape[2]), c_int(img.shape[1]), 
+            c_ulong(img.shape[0]), 
+            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
             c_float(self.dx), c_float(self.dy), c_float(self.dz),
             c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_int(prj.shape[3]), c_int(prj.shape[2]), c_int(prj.shape[1]),
+            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
             c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
         
         if err != 0:
@@ -130,11 +175,11 @@ class ct_projector:
             det_u.ctypes.data_as(POINTER(c_float)), 
             det_v.ctypes.data_as(POINTER(c_float)), 
             src.ctypes.data_as(POINTER(c_float)),
-            c_int(img.shape[0]), 
-            c_int(img.shape[3]), c_int(img.shape[2]), c_int(img.shape[1]), 
+            c_ulong(img.shape[0]), 
+            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
             c_float(self.dx), c_float(self.dy), c_float(self.dz),
             c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_int(prj.shape[3]), c_int(prj.shape[2]), c_int(prj.shape[1]),
+            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
             c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
         
         if err != 0:
@@ -167,11 +212,11 @@ class ct_projector:
             img.ctypes.data_as(POINTER(c_float)), 
             det_center.ctypes.data_as(POINTER(c_float)), 
             src.ctypes.data_as(POINTER(c_float)),
-            c_int(img.shape[0]),
-            c_int(img.shape[3]), c_int(img.shape[2]), c_int(img.shape[1]), 
+            c_ulong(img.shape[0]),
+            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
             c_float(self.dx), c_float(self.dy), c_float(self.dz),
             c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_int(prj.shape[3]), c_int(prj.shape[2]), c_int(prj.shape[1]),
+            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
             c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
         
         if err != 0:
@@ -205,11 +250,11 @@ class ct_projector:
             prj.ctypes.data_as(POINTER(c_float)), 
             det_center.ctypes.data_as(POINTER(c_float)), 
             src.ctypes.data_as(POINTER(c_float)),
-            c_int(img.shape[0]),
-            c_int(img.shape[3]), c_int(img.shape[2]), c_int(img.shape[1]), 
+            c_ulong(img.shape[0]),
+            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
             c_float(self.dx), c_float(self.dy), c_float(self.dz),
             c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_int(prj.shape[3]), c_int(prj.shape[2]), c_int(prj.shape[1]),
+            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
             c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
         
         if err != 0:
