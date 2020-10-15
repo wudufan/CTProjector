@@ -1,5 +1,5 @@
 #pragma once
-#include "Projector.h"
+#include "projector.h"
 
 #include <cuda_runtime.h>
 

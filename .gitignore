@@ -2,3 +2,5 @@
 /cuda/output
 .ipynb_checkpoints
 __pycache__
+*.nii.gz
+*.npy
