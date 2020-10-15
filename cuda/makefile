@@ -1,4 +1,4 @@
-objects = cudaMath.o Projector.o Siddon.o SiddonCone.o
+objects = cudaMath.o projector.o siddon.o siddonCone.o distanceDriven3D.o
 OUT = output
 
 all: $(objects)

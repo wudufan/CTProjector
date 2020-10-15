@@ -1,7 +1,7 @@
-#include "Siddon.h"
-#include "Projector.h"
+#include "siddon.h"
+#include "projector.h"
 #include "cudaMath.h"
-#include "SiddonCone.h"
+#include "siddonCone.h"
 
 #include <stdexcept>
 #include <iostream>
@@ -9,7 +9,7 @@
 
 using namespace std;
 
-__device__ __host__ float3 GetDstForCone(float u, float v,
+__device__ __host__ static float3 GetDstForCone(float u, float v,
 		const float3& detCenter, const float3& detU, const float3& detV, const Grid grid)
 {
 	return make_float3(detCenter.x + detU.x * u + detV.x * v,

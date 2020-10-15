@@ -1,5 +1,5 @@
-#include "Projector.h"
-#include "Siddon.h"
+#include "projector.h"
+#include "siddon.h"
 #include "cudaMath.h"
 
 #include <iostream>

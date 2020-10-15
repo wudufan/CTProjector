@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Projector.h"
+#include "projector.h"
 
 class SiddonCone: public Projector
 {

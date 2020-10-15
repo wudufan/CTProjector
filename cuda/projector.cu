@@ -1,4 +1,4 @@
-#include "Projector.h"
+#include "projector.h"
 
 #include <exception>
 #include <stdexcept>

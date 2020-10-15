@@ -3,6 +3,7 @@ import os
 import numpy as np
 import re
 import scipy.ndimage
+import configparser
 
 module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprojector.so'))
 
@@ -28,11 +29,15 @@ class ct_projector:
         self.off_v = 0
 
     def from_file(self, filename):
-        with open(filename, 'r') as f:    
-            for line in f:
-                tokens = line.strip('\n').split('=')
-                if len(tokens) == 2:
-                    setattr(self, tokens[0].lower(), np.float32(tokens[1]))
+        self.geometry = configparser.ConfigParser()
+        _ = self.geometry.read(filename)
+
+        for o in self.geometry['geometry']:
+            if '_mm' in o:
+                setattr(self, o[:-3], np.float32(self.geometry['geometry'][o]))
+            else:
+                setattr(self, o, np.float32(self.geometry['geometry'][o]))
+
         self.nview = int(self.nview)
         self.nu = int(self.nu)
         self.nv = int(self.nv)
@@ -136,3 +141,79 @@ class ct_projector:
             print (err)
 
         return img
+    
+    def distance_driven_fp_tomo(self, img, det_center, src):
+        '''
+        Distance driven forward projection for tomosynthesis. It assumes that the detector has u=(1,0,0) and v = (0,1,0).
+        The projection should be along the z-axis (main axis for distance driven projection)
+        
+        @params:
+        @img: original image, of size (batch, nz, ny, nx)
+        @det_center: centers of the detector for each projection, of size (nview, 3)
+        @src: position of the source for each projection, of size (nview ,3)
+
+        @return:
+        @prj: the forward projection of size (batch, nview, nv, nu)
+        '''
+        img = img.astype(np.float32)
+        det_center = det_center.astype(np.float32)
+        src = src.astype(np.float32)
+        
+        prj = np.zeros([img.shape[0], det_center.shape[0], self.nv, self.nu], np.float32)
+
+        module.cDistanceDrivenTomoProjection.restype = c_int
+        err = module.cDistanceDrivenTomoProjection(
+            prj.ctypes.data_as(POINTER(c_float)), 
+            img.ctypes.data_as(POINTER(c_float)), 
+            det_center.ctypes.data_as(POINTER(c_float)), 
+            src.ctypes.data_as(POINTER(c_float)),
+            c_int(img.shape[0]),
+            c_int(img.shape[3]), c_int(img.shape[2]), c_int(img.shape[1]), 
+            c_float(self.dx), c_float(self.dy), c_float(self.dz),
+            c_float(self.cx), c_float(self.cy), c_float(self.cz),
+            c_int(prj.shape[3]), c_int(prj.shape[2]), c_int(prj.shape[1]),
+            c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
+        
+        if err != 0:
+            print (err)
+
+        return prj
+    
+    def distance_driven_bp_tomo(self, prj, det_center, src):
+        '''
+        Distance driven backprojection for tomosynthesis. It assumes that the detector has u=(1,0,0) and v = (0,1,0).
+        The backprojection should be along the z-axis (main axis for distance driven projection)
+
+        @params:
+        @prj: the projection to BP, of size (batch, nview, nv, nu)
+        @det_center: centers of the detector for each projection, of size (nview, 3)
+        @src: position of the source for each projection, of size (nview ,3)
+
+        @return:
+        @img: the backprojection image, of size (batch, nz, ny, nx)
+        '''
+
+        prj = prj.astype(np.float32)
+        det_center = det_center.astype(np.float32)
+        src = src.astype(np.float32)
+        
+        img = np.zeros([prj.shape[0], self.nz, self.ny, self.nx], np.float32)
+
+        module.cDistanceDrivenTomoBackprojection.restype = c_int
+        err = module.cDistanceDrivenTomoBackprojection(
+            img.ctypes.data_as(POINTER(c_float)), 
+            prj.ctypes.data_as(POINTER(c_float)), 
+            det_center.ctypes.data_as(POINTER(c_float)), 
+            src.ctypes.data_as(POINTER(c_float)),
+            c_int(img.shape[0]),
+            c_int(img.shape[3]), c_int(img.shape[2]), c_int(img.shape[1]), 
+            c_float(self.dx), c_float(self.dy), c_float(self.dz),
+            c_float(self.cx), c_float(self.cy), c_float(self.cz),
+            c_int(prj.shape[3]), c_int(prj.shape[2]), c_int(prj.shape[1]),
+            c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
+        
+        if err != 0:
+            print (err)
+
+        return img
+
