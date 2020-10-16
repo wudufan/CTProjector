@@ -6,9 +6,9 @@
 
 struct Grid
 {
-	int nx;
-	int ny;
-	int nz;
+	size_t nx;
+	size_t ny;
+	size_t nz;
 	float dx;
 	float dy;
 	float dz;
@@ -19,15 +19,15 @@ struct Grid
 
 struct Detector
 {
-	int nu;
-	int nv;
+	size_t nu;
+	size_t nv;
 	float du;
 	float dv;
 	float off_u;
 	float off_v;
 };
 
-inline __device__ __host__ Grid MakeGrid(int nx, int ny, int nz, float dx, float dy, float dz,
+inline __device__ __host__ Grid MakeGrid(size_t nx, size_t ny, size_t nz, float dx, float dy, float dz,
 		float cx, float cy, float cz)
 {
 	Grid grid;
@@ -44,7 +44,7 @@ inline __device__ __host__ Grid MakeGrid(int nx, int ny, int nz, float dx, float
 	return grid;
 }
 
-inline __device__ __host__ Detector MakeDetector(int nu, int nv, float du, float dv, float off_u, float off_v)
+inline __device__ __host__ Detector MakeDetector(size_t nu, size_t nv, float du, float dv, float off_u, float off_v)
 {
 	Detector det;
 	det.nu = nu;
@@ -60,12 +60,12 @@ inline __device__ __host__ Detector MakeDetector(int nu, int nv, float du, float
 class Projector
 {
 public:
-	int nBatches;		// number of batches
+	size_t nBatches;		// number of batches
 
 	// image parameters
-	int nx;
-	int ny;
-	int nz;
+	size_t nx;
+	size_t ny;
+	size_t nz;
 	float dx; // mm
 	float dy; // mm
 	float dz; // mm
@@ -74,9 +74,9 @@ public:
 	float cz;
 
 	// sinogram parameters
-	int nu;
-	int nview;
-	int nv;
+	size_t nu;
+	size_t nview;
+	size_t nv;
 	float du;
 	float dv;
 	float off_u;
@@ -91,8 +91,8 @@ public:
 
 public:
 	void Setup(int nBatches, 
-		int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		int nu, int nv, int nview, float du, float dv, float off_u, float off_v,
+		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v,
 		float dsd, float dso, int typeProjector = 0);
 
 public:

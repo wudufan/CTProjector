@@ -1,6 +1,7 @@
 /legacy
-/cuda/output
+output
 .ipynb_checkpoints
 __pycache__
 *.nii.gz
 *.npy
+*.o

@@ -117,9 +117,9 @@ void SiddonCone::BackprojectionAbitrary(float* pcuImg, const float* pcuPrj, cons
 
 extern "C" int cSiddonConeProjectionAbitrary(float* prj, const float* img,
 		const float* detCenter, const float* detU, const float* detV, const float* src,
-		int nBatches, 
-		int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		int nu, int nv, int nview, float du, float dv, float off_u, float off_v)
+		size_t nBatches, 
+		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
 {
 	float* pcuPrj = NULL;
 	float* pcuImg = NULL;
@@ -191,9 +191,9 @@ extern "C" int cSiddonConeProjectionAbitrary(float* prj, const float* img,
 
 extern "C" int cupySiddonConeProjectionAbitrary(float* prj, const float* img,
 	const float* detCenter, const float* detU, const float* detV, const float* src,
-	int nBatches, 
-	int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	int nu, int nv, int nview, float du, float dv, float off_u, float off_v)
+	size_t nBatches, 
+	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+	size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
 {
 	try
 	{
@@ -218,9 +218,9 @@ extern "C" int cupySiddonConeProjectionAbitrary(float* prj, const float* img,
 
 extern "C" int cSiddonConeBackprojectionAbitrary(float* img, const float* prj,
 		const float* detCenter, const float* detU, const float* detV, const float* src,
-		int nBatches,
-		int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		int nu, int nv, int nview, float du, float dv, float off_u, float off_v)
+		size_t nBatches,
+		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
 {
 	float* pcuPrj = NULL;
 	float* pcuImg = NULL;
@@ -293,9 +293,9 @@ extern "C" int cSiddonConeBackprojectionAbitrary(float* img, const float* prj,
 
 extern "C" int cupySiddonConeBackprojectionAbitrary(float* img, const float* prj,
 	const float* detCenter, const float* detU, const float* detV, const float* src,
-	int nBatches,
-	int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	int nu, int nv, int nview, float du, float dv, float off_u, float off_v)
+	size_t nBatches,
+	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+	size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
 {
 	try
 	{

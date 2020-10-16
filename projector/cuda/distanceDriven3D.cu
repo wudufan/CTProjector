@@ -40,7 +40,7 @@ dst - the buffer to receive the accumulation, of size (nx+1, ny+1, nz)
 src - the original image, of size (nx, ny, nz)
 nx,ny,nz - the dimension of the src image
 */
-__global__ void AccumulateXYAlongXKernel(double* dst, const float* src, int nx, int ny, int nz)
+__global__ void AccumulateXYAlongXKernel(double* dst, const float* src, size_t nx, size_t ny, size_t nz)
 {
 	int iy = blockDim.y * blockIdx.y + threadIdx.y;
 	int iz = blockDim.z * blockIdx.z + threadIdx.z;
@@ -67,7 +67,7 @@ the function should be called after AccumulateXYAlongXKernel. it directly accumu
 acc - the buffer for the accumulation, of size (nx+1, ny+1, nz)
 nx,ny,nz - the dimension of the src image
 */
-__global__ void AccumulateXYAlongYKernel(double* acc, int nx, int ny, int nz)
+__global__ void AccumulateXYAlongYKernel(double* acc, size_t nx, size_t ny, size_t nz)
 {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
 	int iz = blockDim.z * blockIdx.z + threadIdx.z;
@@ -120,7 +120,7 @@ __device__ static int Clamp(int x, int start, int end)
 }
 
 // 2d interpolation
-__device__ static double InterpolateXY(const double* acc, float x, float y, int iz, int nx, int ny, int nz)
+__device__ static double InterpolateXY(const double* acc, float x, float y, int iz, size_t nx, size_t ny, size_t nz)
 {
 	x = ClampFloat(x, 0, nx);
 	y = ClampFloat(y, 0, ny);
@@ -351,9 +351,9 @@ void DistanceDrivenTomo::ProjectionTomo(const float* pcuImg, float* pcuPrj, cons
 // C interface
 extern "C" int cDistanceDrivenTomoProjection(float* prj, const float* img,
 		const float* detCenter, const float* src,
-		int nBatches,
-		int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		int nu, int nv, int nview, float du, float dv, float off_u, float off_v)
+		size_t nBatches,
+		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
 {
 	float* pcuPrj = NULL;
 	float* pcuImg = NULL;
@@ -410,9 +410,9 @@ extern "C" int cDistanceDrivenTomoProjection(float* prj, const float* img,
 
 extern "C" int cupyDistanceDrivenTomoProjection(float* prj, const float* img,
 	const float* detCenter, const float* src,
-	int nBatches,
-	int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	int nu, int nv, int nview, float du, float dv, float off_u, float off_v)
+	size_t nBatches,
+	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+	size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
 {
 	try
 	{
@@ -435,7 +435,7 @@ extern "C" int cupyDistanceDrivenTomoProjection(float* prj, const float* img,
 
 // preweight the projection data by the approximated ray length in a pixel
 __global__ void PreweightBPCartKernelXY(float* pPrjs,
-		const int* iviews, int nValidViews, int nview, 
+		const int* iviews, size_t nValidViews, size_t nview, 
 		const float3* pDetCenter, const float3* pSrc, float dz, const Detector det)
 {
 	int iu = blockIdx.x * blockDim.x + threadIdx.x;
@@ -460,7 +460,7 @@ __global__ void PreweightBPCartKernelXY(float* pPrjs,
 
 // dst has the dimension (batch, nview, nv+1, nu+1)
 // src has the dimension (batch, nview, nv, nu)
-__global__ void AccumulateUVAlongUKernel(double* dst, const float* src, int nu, int nv, int nview)
+__global__ void AccumulateUVAlongUKernel(double* dst, const float* src, size_t nu, size_t nv, size_t nview)
 {
 	int iv = blockDim.y * blockIdx.y + threadIdx.y;
 	int iview = blockDim.z * blockIdx.z + threadIdx.z;
@@ -481,7 +481,7 @@ __global__ void AccumulateUVAlongUKernel(double* dst, const float* src, int nu, 
 
 // this kernel should be called right after AccumulateUVAlongUKernel to integrate along y axis,
 // acc has the dimension (batch, nview, nv+1, nu+1)
-__global__ void AccumulateUVAlongVKernel(double* acc, int nu, int nv, int nview)
+__global__ void AccumulateUVAlongVKernel(double* acc, size_t nu, size_t nv, size_t nview)
 {
 	int iu = blockDim.x * blockIdx.x + threadIdx.x;
 	int iview = blockDim.z * blockIdx.z + threadIdx.z;
@@ -516,7 +516,7 @@ __device__ static float2 ProjectConeToDetCart(float3 pt, float3 detCenter, float
 
 // 2d interpolation
 // acc has dimension (nu, nv, nview)
-__device__ static double InterpolateUV(const double* acc, float u, float v, int iview, int nu, int nv, int nview)
+__device__ static double InterpolateUV(const double* acc, float u, float v, int iview, size_t nu, size_t nv, size_t nview)
 {
 	u = ClampFloat(u, 0, nu);
 	v = ClampFloat(v, 0, nv);
@@ -544,7 +544,7 @@ __device__ static double InterpolateUV(const double* acc, float u, float v, int 
 
 // BP when detector aligns with the cartesian coordinate
 __global__ void DDBPConeCartKernelXY(float* pImg, const double* acc,
-		const int* iviews, int nValidViews, int nview,
+		const int* iviews, size_t nValidViews, size_t nview,
 		const float3* pDetCenter, const float3* pSrc,
 		const Grid grid, const Detector det)
 {
@@ -679,9 +679,9 @@ void DistanceDrivenTomo::BackprojectionTomo(float* pcuImg, const float* pcuPrj, 
 // C interface
 extern "C" int cDistanceDrivenTomoBackprojection(float* img, const float* prj,
 		const float* detCenter, const float* src,
-		int nBatches,
-		int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		int nu, int nv, int nview, float du, float dv, float off_u, float off_v)
+		size_t nBatches,
+		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
 {
 	float* pcuPrj = NULL;
 	float* pcuImg = NULL;
@@ -739,9 +739,9 @@ extern "C" int cDistanceDrivenTomoBackprojection(float* img, const float* prj,
 
 extern "C" int cupyDistanceDrivenTomoBackprojection(float* img, const float* prj,
 	const float* detCenter, const float* src,
-	int nBatches,
-	int nx, int ny, int nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	int nu, int nv, int nview, float du, float dv, float off_u, float off_v)
+	size_t nBatches,
+	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+	size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
 {
 	try
 	{
