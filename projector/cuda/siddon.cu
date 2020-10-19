@@ -10,16 +10,6 @@ using namespace std;
 
 #define eps 1e-6f
 
-// image coordinate: the origin is at the lower left corner of the first pixel
-__device__ float3 PhysicsToImg(float3 pt, const Grid grid)
-{
-	pt.x = (pt.x - grid.cx) / grid.dx + grid.nx / 2.0f;
-	pt.y = (pt.y - grid.cy) / grid.dy + grid.ny / 2.0f;
-	pt.z = (pt.z - grid.cz) / grid.dz + grid.nz / 2.0f;
-
-	return pt;
-}
-
 __device__ bool InboundAlpha(float& alpha0v, float& alphaNv, float dDstSrcv, float srcv, int gridnv)
 {
 	if (fabsf(dDstSrcv) > eps)

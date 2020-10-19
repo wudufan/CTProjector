@@ -118,3 +118,100 @@ void GetThreadsForXY(dim3 &threads, dim3 &blocks, int nx, int ny, int nz)
 
 	blocks = dim3(ceilf(nx / (float)threads.x), ceilf(ny / (float)threads.y), ceilf(nz / (float)threads.z));
 }
+
+
+__device__ float ClampFloat(float x, float start, float end)
+{
+	if (x < start)
+	{
+		return start;
+	}
+	else if (x >= end)
+	{
+		return end - 1;
+	}
+	else
+	{
+		return x;
+	}
+}
+
+
+// clamp x to range [start, end)
+__device__ int Clamp(int x, int start, int end)
+{
+	if (x < start)
+	{
+		return start;
+	}
+	else if (x >= end)
+	{
+		return end - 1;
+	}
+	else
+	{
+		return x;
+	}
+}
+
+// 2d interpolation
+__device__ double InterpolateXY(const double* buff, float x, float y, int iz, size_t nx, size_t ny, size_t nz)
+{
+	x = ClampFloat(x, 0, nx);
+	y = ClampFloat(y, 0, ny);
+
+	int ix = int(x);
+	int iy = int(y);
+	int ix1 = ix + 1;
+	int iy1 = iy + 1;
+
+//	ix = Clamp(ix, 0, nx);
+//	iy = Clamp(iy, 0, ny);
+	ix1 = Clamp(ix1, 0, nx);
+	iy1 = Clamp(iy1, 0, ny);
+
+
+	double wx = (x - ix);
+	double wy = (y - iy);
+
+	return double(buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wy) +
+				  buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wy) +
+				  buff[iz * nx * ny + iy1 * nx + ix] * (1 - wx) * wy +
+				  buff[iz * nx * ny + iy1 * nx + ix1] * wx * wy);
+
+}
+
+// 2d interpolation
+__device__ float InterpolateXY(const float* buff, float x, float y, int iz, size_t nx, size_t ny, size_t nz, bool truncate)
+{
+	if (truncate)
+	{
+		if (x < 0 || x >= nx || y < 0 || y >= ny)
+		{
+			return 0;
+		}
+	}
+
+	x = ClampFloat(x, 0, nx);
+	y = ClampFloat(y, 0, ny);
+
+	int ix = int(x);
+	int iy = int(y);
+	int ix1 = ix + 1;
+	int iy1 = iy + 1;
+
+//	ix = Clamp(ix, 0, nx);
+//	iy = Clamp(iy, 0, ny);
+	ix1 = Clamp(ix1, 0, nx);
+	iy1 = Clamp(iy1, 0, ny);
+
+
+	float wx = (x - ix);
+	float wy = (y - iy);
+
+	return float(buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wy) +
+				 buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wy) +
+				 buff[iz * nx * ny + iy1 * nx + ix] * (1 - wx) * wy +
+				 buff[iz * nx * ny + iy1 * nx + ix1] * wx * wy);
+
+}

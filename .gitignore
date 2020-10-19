@@ -5,3 +5,4 @@ __pycache__
 *.nii.gz
 *.npy
 *.o
+*.mat

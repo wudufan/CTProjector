@@ -62,3 +62,7 @@ inline __device__ __host__ float3 vecNormalize(float3 v)
 void GetThreadsForXZ(dim3 &threads, dim3 &blocks, int nx, int ny, int nz);
 
 void GetThreadsForXY(dim3 &threads, dim3 &blocks, int nx, int ny, int nz);
+
+// 2d interpolation to substitute texture
+__device__ double InterpolateXY(const double* buff, float x, float y, int iz, size_t nx, size_t ny, size_t nz);
+__device__ float InterpolateXY(const float* buff, float x, float y, int iz, size_t nx, size_t ny, size_t nz, bool truncate = false);

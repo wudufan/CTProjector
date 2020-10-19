@@ -1,11 +1,13 @@
-objects = cudaMath.o projector.o siddon.o siddonCone.o distanceDriven3D.o
+objects = cudaMath.o projector.o siddon.o siddonCone.o siddonFan.o distanceDriven3D.o fbp.o
 OUT = output
+TARGET = libprojector.so
 
 all: $(objects)
 	cd ${OUT}; \
-	nvcc -v --shared $(objects) --gpu-architecture=sm_70 -o libprojector.so
+	nvcc --shared $(objects) --gpu-architecture=sm_70 -lcufft -o ${TARGET}
+	cp ${OUT}/${TARGET} ../${TARGET}
 
 %.o: %.cu
-	nvcc -O3 -v --gpu-architecture=sm_70 --compiler-options '-fPIC' -I.. -dc $< -o ${OUT}/$@
+	nvcc -O3 --gpu-architecture=sm_70 --compiler-options '-fPIC' -I.. -dc $< -o ${OUT}/$@
 
 $(shell mkdir -p $(OUT))

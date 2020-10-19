@@ -57,6 +57,25 @@ inline __device__ __host__ Detector MakeDetector(size_t nu, size_t nv, float du,
 	return det;
 }
 
+inline __device__ float3 PhysicsToImg(float3 pt, const Grid grid)
+{
+	pt.x = (pt.x - grid.cx) / grid.dx + grid.nx / 2.0f;
+	pt.y = (pt.y - grid.cy) / grid.dy + grid.ny / 2.0f;
+	pt.z = (pt.z - grid.cz) / grid.dz + grid.nz / 2.0f;
+
+	return pt;
+}
+
+inline __device__ float3 ImgToPhysics(float3 pt, const Grid grid)
+{
+	pt.x = (pt.x - grid.nx / 2.f) * grid.dx + grid.cx;
+	pt.y = (pt.y - grid.ny / 2.f) * grid.dy + grid.cy;
+	pt.z = (pt.z - grid.nz / 2.f) * grid.dz + grid.cz;
+
+	return pt;
+}
+
+
 class Projector
 {
 public:

@@ -11,17 +11,6 @@
 using namespace std;
 
 // DD projection branchless version
-
-// origin of image coordinate is the corner of the first pixel, the same with texture coordinate.
-__device__ static float3 PhysicsToImg(float3 pt, const Grid grid)
-{
-	pt.x = (pt.x - grid.cx) / grid.dx + grid.nx / 2.0f;
-	pt.y = (pt.y - grid.cy) / grid.dy + grid.ny / 2.0f;
-	pt.z = (pt.z - grid.cz) / grid.dz + grid.nz / 2.0f;
-
-	return pt;
-}
-
 __device__ __host__ static float3 GetDstForCone(float u, float v,
 		const float3& detCenter, const float3& detU, const float3& detV)
 {
@@ -83,68 +72,6 @@ __global__ void AccumulateXYAlongYKernel(double* acc, size_t nx, size_t ny, size
 	{
 		acc[(iy + 1) * (nx + 1)] = acc[(iy + 1) * (nx + 1)] + acc[iy * (nx + 1)];
 	}
-}
-
-__device__ static float ClampFloat(float x, float start, float end)
-{
-	if (x < start)
-	{
-		return start;
-	}
-	else if (x >= end)
-	{
-		return end - 1;
-	}
-	else
-	{
-		return x;
-	}
-}
-
-
-// clamp x to range [start, end)
-__device__ static int Clamp(int x, int start, int end)
-{
-	if (x < start)
-	{
-		return start;
-	}
-	else if (x >= end)
-	{
-		return end - 1;
-	}
-	else
-	{
-		return x;
-	}
-}
-
-// 2d interpolation
-__device__ static double InterpolateXY(const double* acc, float x, float y, int iz, size_t nx, size_t ny, size_t nz)
-{
-	x = ClampFloat(x, 0, nx);
-	y = ClampFloat(y, 0, ny);
-
-	int ix = int(x);
-	int iy = int(y);
-	int ix1 = ix + 1;
-	int iy1 = iy + 1;
-
-//	ix = Clamp(ix, 0, nx);
-//	iy = Clamp(iy, 0, ny);
-	ix1 = Clamp(ix1, 0, nx);
-	iy1 = Clamp(iy1, 0, ny);
-
-
-	double wx = (x - ix);
-	double wy = (y - iy);
-
-	return double(acc[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wy) +
-			acc[iz * nx * ny + iy * nx + ix1] * wx * (1 - wy) +
-			acc[iz * nx * ny + iy1 * nx + ix] * (1 - wx) * wy +
-			acc[iz * nx * ny + iy1 * nx + ix1] * wx * wy);
-
-
 }
 
 /*
@@ -514,34 +441,6 @@ __device__ static float2 ProjectConeToDetCart(float3 pt, float3 detCenter, float
 
 }
 
-// 2d interpolation
-// acc has dimension (nu, nv, nview)
-__device__ static double InterpolateUV(const double* acc, float u, float v, int iview, size_t nu, size_t nv, size_t nview)
-{
-	u = ClampFloat(u, 0, nu);
-	v = ClampFloat(v, 0, nv);
-
-	int iu = int(u);
-	int iv = int(v);
-	int iu1 = iu + 1;
-	int iv1 = iv + 1;
-
-//	iu = Clamp(iu, 0, nu);
-//	iv = Clamp(iv, 0, nv);
-	iu1 = Clamp(iu1, 0, nu);
-	iv1 = Clamp(iv1, 0, nv);
-
-	double wu = (u - iu);
-	double wv = (v - iv);
-
-	return double(acc[iview * nu * nv + iv * nu + iu] * (1 - wu) * (1 - wv) +
-			acc[iview * nu * nv + iv * nu + iu1] * wu * (1 - wv) +
-			acc[iview * nu * nv + iv1 * nu + iu] * (1 - wu) * wv +
-			acc[iview * nu * nv + iv1 * nu + iu1] * wu * wv);
-
-
-}
-
 // BP when detector aligns with the cartesian coordinate
 __global__ void DDBPConeCartKernelXY(float* pImg, const double* acc,
 		const int* iviews, size_t nValidViews, size_t nview,
@@ -574,10 +473,10 @@ __global__ void DDBPConeCartKernelXY(float* pImg, const double* acc,
 		float v2 = ProjectConeToDetCart(make_float3(x, y + grid.dy / 2, z), detCenter, src, det).y;
 
 
-		val += (InterpolateUV(acc, u2, v2, iview, det.nu + 1, det.nv + 1, nview)
-				- InterpolateUV(acc, u2, v1, iview, det.nu + 1, det.nv + 1, nview)
-				+ InterpolateUV(acc, u1, v1, iview, det.nu + 1, det.nv + 1, nview)
-				- InterpolateUV(acc, u1, v2, iview, det.nu + 1, det.nv + 1, nview)) / ((u2 - u1) * (v2 - v1));
+		val += (InterpolateXY(acc, u2, v2, iview, det.nu + 1, det.nv + 1, nview)
+				- InterpolateXY(acc, u2, v1, iview, det.nu + 1, det.nv + 1, nview)
+				+ InterpolateXY(acc, u1, v1, iview, det.nu + 1, det.nv + 1, nview)
+				- InterpolateXY(acc, u1, v2, iview, det.nu + 1, det.nv + 1, nview)) / ((u2 - u1) * (v2 - v1));
 
 		// pImg[iz * grid.nx * grid.ny + iy * grid.nx + ix] = z - src.z;
 		
