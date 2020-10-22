@@ -441,7 +441,9 @@ __global__ void bpFanKernel3D(float* pImg, const float* prj, const float* pDeg,
 		return;
 	}
 
-    register float3 pt = ImgToPhysics(make_float3(ix, iy, izBatch * nzBatch), grid);
+    // the image coordinates here has the lower left corner of the first pixel defined as (0,0,0)
+    // because (ix,iy,iz) are based on the centers of the pixels, so an offset of 0.5 should be added. 
+    register float3 pt = ImgToPhysics(make_float3(ix + 0.5f, iy + 0.5f, izBatch * nzBatch + 0.5f), grid);
 
 	register float val[nzBatch] = {0};
 	register float cosDeg, sinDeg, rx, ry, pu, pv, a, dist;

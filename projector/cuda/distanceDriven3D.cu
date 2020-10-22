@@ -145,18 +145,10 @@ __global__ void DDFPConeKernelXY(float* pPrjs, const double* acc,
 		float y1 = src.y + ry1 * (iz - src.z);
 		float y2 = src.y + ry2 * (iz - src.z);
 
-//		val += InterpolateXY(acc, x2, y2, iz, grid.nx+1, grid.ny+1, grid.nz);
-
 		val += (InterpolateXY(acc, x2, y2, iz, grid.nx+1, grid.ny+1, grid.nz)
 				+ InterpolateXY(acc, x1, y1, iz, grid.nx+1, grid.ny+1, grid.nz)
 				- InterpolateXY(acc, x2, y1, iz, grid.nx+1, grid.ny+1, grid.nz)
 				- InterpolateXY(acc, x1, y2, iz, grid.nx+1, grid.ny+1, grid.nz)) / ((x2 - x1) * (y2 - y1));
-
-		// (0.5, 0.5) of texAcc is the integral at the border of image, since x1,x2,y1,y2 are coordinates on the image, so
-		// an offset of +0.5 should be added when fetching the integral value
-//		val += (tex3D<float>(texAcc, iz + 0.5f, y2 + 0.5f, x2 + 0.5f) + tex3D<float>(texAcc, iz + 0.5f, y1 + 0.5f, x1 + 0.5f)
-//				- tex3D<float>(texAcc, iz + 0.5f, y1 + 0.5f, x2 + 0.5f) - tex3D<float>(texAcc, iz + 0.5f, y2 + 0.5f, x1 + 0.5f))
-//						/ ((x2 - x1) * (y2 - y1));
 
 	}
 

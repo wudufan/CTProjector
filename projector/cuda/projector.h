@@ -57,6 +57,7 @@ inline __device__ __host__ Detector MakeDetector(size_t nu, size_t nv, float du,
 	return det;
 }
 
+// The original point of the image is defined as the corner of the first pixel under this conversion 
 inline __device__ float3 PhysicsToImg(float3 pt, const Grid grid)
 {
 	pt.x = (pt.x - grid.cx) / grid.dx + grid.nx / 2.0f;
@@ -66,11 +67,28 @@ inline __device__ float3 PhysicsToImg(float3 pt, const Grid grid)
 	return pt;
 }
 
+inline __device__ float2 PhysicsToImg(float2 pt, const Grid grid)
+{
+	pt.x = (pt.x - grid.cx) / grid.dx + grid.nx / 2.0f;
+	pt.y = (pt.y - grid.cy) / grid.dy + grid.ny / 2.0f;
+
+	return pt;
+}
+
 inline __device__ float3 ImgToPhysics(float3 pt, const Grid grid)
 {
 	pt.x = (pt.x - grid.nx / 2.f) * grid.dx + grid.cx;
 	pt.y = (pt.y - grid.ny / 2.f) * grid.dy + grid.cy;
 	pt.z = (pt.z - grid.nz / 2.f) * grid.dz + grid.cz;
+
+	return pt;
+}
+
+
+inline __device__ float2 ImgToPhysics(float2 pt, const Grid grid)
+{
+	pt.x = (pt.x - grid.nx / 2.f) * grid.dx + grid.cx;
+	pt.y = (pt.y - grid.ny / 2.f) * grid.dy + grid.cy;
 
 	return pt;
 }
