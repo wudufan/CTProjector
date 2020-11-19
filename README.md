@@ -23,3 +23,4 @@ Conebeam| Flat panel| Abitrary | Siddon | None
 Conebeam| Flat panel| Tomosynthesis | Distance-driven| The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
 Fanbeam | Equiangular| Circular | Siddon | numpy-only
 Fanbeam | Equiangular| Circular | FBP | numpy-only. Filter + pixel-driven BP.
+Fanbeam | Equiangular| Circular | Distance-driven | cupy-only
