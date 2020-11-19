@@ -116,25 +116,56 @@ __global__ void DDFPFanKernelX(float* pPrjs, const float* pAccX, const float* pD
 		float x1 = src.x + r1 * (iy - src.y);
 		float x2 = src.x + r2 * (iy - src.y);
 
-        val += InterpolateXZ(pAccX, x2, iy, z, grid.nx + 1, grid.ny, grid.nz, true) - 
-               InterpolateXZ(pAccX, x1, iy, z, grid.nx + 1, grid.ny, grid.nz, true)
+		/*
+		The image coordinates has the corner of the first pixel as the (0,0,0);
+		The x1, x2 here are in the corner coordinate;
+		The iy, z here are in the pixel-center coordinate (notice that z has an offset of 0.5)
+		paccx(z,iy,0) means the integral at x=0 (left of first pixel) for (iy, z), which is always 0 
+		paccx(z,iy,1) means the integral at x=1 (left of second pixel) for (iy, z)
+
+		For integer ix, paccx[ix]=integral(0 to ix), and paccx[ix+1] = integral(0 to ix+1)
+		Because the pixel value is constant inside between ix and ix+1, linear interpolation at x (ix<x<ix+1) gives the integral(0,x)
+
+		Hence, paccx(x2) - paccx(x1) gives the integral(ix1, ix2)
+
+		The final distance driven is the average, so it should be nomalized by length (x2-x1)
+		*/
+		val += (InterpolateXZ(pAccX, x2, iy, z, grid.nx + 1, grid.ny, grid.nz) - 
+			    InterpolateXZ(pAccX, x1, iy, z, grid.nx + 1, grid.ny, grid.nz)) / (x2 - x1);
+			
 	}
 
 	// normalize by length
 	val *= grid.dy / fabsf(__cosf(deg - a));
 
-	pPrjs[iview * nu * nv + iv * nu + iu] = val;
+	pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] = val;
 
 }
 
-__global__ void DDFPFanKernelY(float* pPrjs, cudaTextureObject_t texAcc, const float* pDeg,
+
+/*
+Distance driven fanbeam projection for src.y > src.x
+
+pPrjs - projection of size [nview, nv, nu]
+pAccY - accumulation of images along y, size [nz, ny+1, nx]
+pDeg - projection angles, size [nview]
+iviews - list of projection indices where abs(src.y) > abs(src.x). Only on these projections will call this function, size [nValidViews]
+nValidViews - length of iviews
+nviews - total view number
+grid - image grid
+det - detector information
+dsd - distance between source and detector
+dso - distance between source and iso-center
+
+*/
+__global__ void DDFPFanKernelY(float* pPrjs, const float* pAccY, const float* pDeg,
 		const int* iviews, int nValidViews,
-		int nview, int nc, const Grid grid, const Detector det,
+		int nview, const Grid grid, const Detector det,
 		float dsd, float dso)
 {
 	int iu = blockDim.x * blockIdx.x + threadIdx.x;
-	int ind = blockDim.y * blockIdx.y + threadIdx.y;
-	int iv = blockIdx.z * blockDim.z + threadIdx.z;
+	int iv = blockDim.y * blockIdx.y + threadIdx.y;
+	int ind = blockIdx.z * blockDim.z + threadIdx.z;
 
 	if (iu >= det.nu || ind >= nValidViews || iv >= det.nv)
 	{
@@ -162,7 +193,7 @@ __global__ void DDFPFanKernelY(float* pPrjs, cudaTextureObject_t texAcc, const f
 	src = PhysicsToImg(src, grid);
 	dst1 = PhysicsToImg(dst1, grid);
 	dst2 = PhysicsToImg(dst2, grid);
-	z = (z - grid.cz) / grid.dz + grid.nz / 2.f;
+	z = (z - grid.cz) / grid.dz + grid.nz / 2.f - 0.5f;
 
 	// make sure dst1.y < dst2.y
 	if (dst1.y > dst2.y)
@@ -181,38 +212,34 @@ __global__ void DDFPFanKernelY(float* pPrjs, cudaTextureObject_t texAcc, const f
 		float y1 = src.y + r1 * (ix - src.x);
 		float y2 = src.y + r2 * (ix - src.x);
 
-		// the center of x0 of texAcc is the integral at the left border of x0 of image, since x1 and x2 are coordinates on the image, so
-		// an offset of +0.5 should be added when fetching the integral value
-		val += (tex3D<float>(texAcc, z, y2 + 0.5f, ix) - tex3D<float>(texAcc, z, y1 + 0.5f, ix)) / (y2 - y1);
+		// Please see DDFPFanKernelX for detailed explanation
+		val += (InterpolateYZ(pAccY, ix, y2, z, grid.nx, grid.ny + 1, grid.nz) - 
+			    InterpolateYZ(pAccY, ix, y1, z, grid.nx, grid.ny + 1, grid.nz)) / (y2 - y1);
 	}
 
 	// normalize by length
 	val *= grid.dx / fabsf(__sinf(deg - a));
 
-	pPrjs[iu * nview * det.nv * nc + iview * det.nv * nc + iv * nc] = val;
+	pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] = val;
 
 }
 
 void DistanceDrivenFan::Projection(const float* pcuImg, float* pcuPrj, const float* pcuDeg)
 {
-	// allocate textures for accumulated images
+	// allocate for accumulated images
 	float* pAccX = NULL;
 	float* pAccY = NULL;
 	int* cuIviewsX = NULL;
 	int* cuIviewsY = NULL;
-	cudaArray_t arrAccX = NULL;
-	cudaArray_t arrAccY = NULL;
-	cudaTextureObject_t texAccX = 0;
-	cudaTextureObject_t texAccY = 0;
 
 	try
 	{
-		if (cudaSuccess != cudaMalloc(&pAccX, sizeof(float) * (nx+1) * ny * nz * nBatches * nChannels))
+		if (cudaSuccess != cudaMalloc(&pAccX, sizeof(float) * (nx+1) * ny * nz))
 		{
 			throw runtime_error("pAccX allocation failed");
 		}
 
-		if (cudaSuccess != cudaMalloc(&pAccY, sizeof(float) * nx * (ny + 1) * nz * nBatches * nChannels))
+		if (cudaSuccess != cudaMalloc(&pAccY, sizeof(float) * nx * (ny + 1) * nz))
 		{
 			throw runtime_error("pAccY allocation failed");
 		}
@@ -227,47 +254,61 @@ void DistanceDrivenFan::Projection(const float* pcuImg, float* pcuPrj, const flo
 			throw runtime_error("cuIviewsY allocation failed");
 		}
 
-		cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+		// split the angles into set for accX and accY
+		float* pDegs = new float [nview];
+		int* iviewsX = new int [nview];
+		int* iviewsY = new int [nview];
+		int nValidViewsX = 0;
+		int nValidViewsY = 0;
 
-		if (cudaSuccess != cudaMalloc3DArray(&arrAccX, &channelDesc, make_cudaExtent(nz, ny, nx+1)))
+		cudaMemcpy(pDegs, pcuDeg, sizeof(float) * nview, cudaMemcpyDeviceToHost);
+		for (int iview = 0; iview < nview; iview++)
 		{
-			throw runtime_error("arrAccX allocation failed");
+			float deg = pDegs[iview];
+			if (abs(cosf(deg)) > abs(sinf(deg)))
+			{
+				iviewsX[nValidViewsX] = iview;
+				nValidViewsX++;
+			}
+			else
+			{
+				iviewsY[nValidViewsY] = iview;
+				nValidViewsY++;
+			}
 		}
+		cudaMemcpy(cuIviewsX, iviewsX, sizeof(int) * nview, cudaMemcpyHostToDevice);
+		cudaMemcpy(cuIviewsY, iviewsY, sizeof(int) * nview, cudaMemcpyHostToDevice);
 
-		if (cudaSuccess != cudaMalloc3DArray(&arrAccY, &channelDesc, make_cudaExtent(nz, ny+1, nx)))
+		delete [] iviewsX;
+		delete [] iviewsY;
+		delete [] pDegs;
+
+		Grid grid = MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz);
+		Detector det = MakeDetector(nu, nv, du, dv, off_u, off_v);
+
+		// step 1: calculate accumulated images
+		dim3 threadX(1,256,1);
+		dim3 blockX(1, ceilf(ny / 256.0f), nz);
+		dim3 threadY(256,1,1);
+		dim3 blockY(ceilf(nx / 256.0f), 1, nz);
+		for (int ib = 0; ib < nBatches; ib++)
 		{
-			throw runtime_error("arrAccY allocation failed");
+			// AccX and pAccY has the dimension in order (batch, z, y, x)
+			AccumulateKernelX<<<blockX, threadX>>>(pAccX + ib * (nx + 1) * ny * nz, pcuImg + ib * nx * ny * nz, nx, ny, nz);
+			AccumulateKernelY<<<blockY, threadY>>>(pAccY + ib * nx * (ny + 1) * nz, pcuImg + ib * nx * ny * nz, nx, ny, nz);
 		}
+		cudaDeviceSynchronize();
 
-		cudaTextureDesc texDesc;
-		memset(&texDesc, 0, sizeof(texDesc));
-		texDesc.addressMode[0] = cudaAddressModeBorder;
-		texDesc.addressMode[1] = cudaAddressModeBorder;
-		texDesc.addressMode[2] = cudaAddressModeClamp;
-		texDesc.filterMode = cudaFilterModeLinear;
-		texDesc.readMode = cudaReadModeElementType;
-		texDesc.normalizedCoords = 0;
-
-		cudaResourceDesc resDesc;
-		memset(&resDesc, 0, sizeof(resDesc));
-		resDesc.resType = cudaResourceTypeArray;
-		resDesc.res.array.array = arrAccX;
-
-		if (cudaSuccess != cudaCreateTextureObject(&texAccX, &resDesc, &texDesc, NULL))
+		// step 2: interpolation
+		dim3 threadDetX, blockDetX, threadDetY, blockDetY;
+		GetThreadsForXZ(threadDetX, blockDetX, nu, nv, nValidViewsX);
+		GetThreadsForXZ(threadDetY, blockDetY, nu, nv, nValidViewsY);
+		for (int ib = 0; ib < nBatches; ib++)
 		{
-			throw std::runtime_error("texAccX binding failure!");
+			DDFPFanKernelX<<<blockDetX, threadDetX>>>(pcuPrj + ib * nu * nv * nview, pAccX, pcuDeg, cuIviewsX, nValidViewsX, nview, grid, det, dsd, dso);
+			DDFPFanKernelY<<<blockDetY, threadDetY>>>(pcuPrj + ib * nu * nv * nview, pAccY, pcuDeg, cuIviewsY, nValidViewsY, nview, grid, det, dsd, dso);
+			cudaDeviceSynchronize();
 		}
-
-		texDesc.addressMode[0] = cudaAddressModeBorder;
-		texDesc.addressMode[1] = cudaAddressModeClamp;
-		texDesc.addressMode[2] = cudaAddressModeBorder;
-		resDesc.res.array.array = arrAccY;
-
-		if (cudaSuccess != cudaCreateTextureObject(&texAccY, &resDesc, &texDesc, NULL))
-		{
-			throw std::runtime_error("texAccY binding failure!");
-		}
-
 	}
 	catch (exception &e)
 	{
@@ -275,10 +316,6 @@ void DistanceDrivenFan::Projection(const float* pcuImg, float* pcuPrj, const flo
 		if (pAccY != NULL) cudaFree(pAccY);
 		if (cuIviewsX != NULL) cudaFree(cuIviewsX);
 		if (cuIviewsY != NULL) cudaFree(cuIviewsY);
-		if (arrAccX != NULL) cudaFreeArray(arrAccX);
-		if (arrAccY != NULL) cudaFreeArray(arrAccY);
-		if (texAccX != 0) cudaDestroyTextureObject(texAccX);
-		if (texAccY != 0) cudaDestroyTextureObject(texAccY);
 
 		ostringstream oss;
 		oss << "DistanceDrivenFan::Projection Error: " << e.what() << " (" << cudaGetErrorString(cudaGetLastError()) << ")";
@@ -286,117 +323,53 @@ void DistanceDrivenFan::Projection(const float* pcuImg, float* pcuPrj, const flo
 		throw oss.str().c_str();
 	}
 
-	// split the angles into set for accX and accY
-	float* pDegs = new float [nview];
-	int* iviewsX = new int [nview];
-	int* iviewsY = new int [nview];
-	int nValidViewsX = 0;
-	int nValidViewsY = 0;
-
-	cudaMemcpy(pDegs, pcuDeg, sizeof(float) * nview, cudaMemcpyDeviceToHost);
-	for (int iview = 0; iview < nview; iview++)
-	{
-		float deg = pDegs[iview];
-		if (abs(cosf(deg)) > abs(sinf(deg)))
-		{
-			iviewsX[nValidViewsX] = iview;
-			nValidViewsX++;
-		}
-		else
-		{
-			iviewsY[nValidViewsY] = iview;
-			nValidViewsY++;
-		}
-	}
-	cudaMemcpy(cuIviewsX, iviewsX, sizeof(int) * nview, cudaMemcpyHostToDevice);
-	cudaMemcpy(cuIviewsY, iviewsY, sizeof(int) * nview, cudaMemcpyHostToDevice);
-
-	delete [] iviewsX;
-	delete [] iviewsY;
-	delete [] pDegs;
-
-	Grid grid = MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz);
-	Detector det = MakeDetector(nu, nv, du, dv, off_u, off_v);
-
-	// step 1: calculate accumulated images
-	dim3 threadX(1,256,1);
-	dim3 blockX(1, ceilf(ny / 256.0f), nz);
-	dim3 threadY(256,1,1);
-	dim3 blockY(ceilf(nx / 256.0f), 1, nz);
-	for (int ib = 0; ib < nBatches; ib++)
-	{
-		for (int ic = 0; ic < nChannels; ic++)
-		{
-			// pAccX and pAccY has the dimension in order (batch, channel, x, y, z) so that can be copied to textures
-			AccumulateKernelX<<<blockX, threadX>>>(pAccX + (ib * nChannels + ic) * (nx + 1) * ny * nz,
-					pcuImg + ib * nx * ny * nz * nChannels + ic , nx, ny, nz, nChannels);
-			AccumulateKernelY<<<blockY, threadY>>>(pAccY + (ib * nChannels + ic) * nx * (ny + 1) * nz,
-					pcuImg + ib * nx * ny * nz * nChannels + ic , nx, ny, nz, nChannels);
-		}
-	}
-	cudaDeviceSynchronize();
-
-	// step 2: interpolation
-//	dim3 thread(256, 1, 1);
-//	dim3 block(ceilf(nu / 256.f), 1, 1);
-	dim3 threadsX, blocksX, threadsY, blocksY;
-	GetThreadsForXY(threadsX, blocksX, nu, nValidViewsX, nv);
-	GetThreadsForXY(threadsY, blocksY, nu, nValidViewsY, nv);
-	for (int ib = 0; ib < nBatches; ib++)
-	{
-		for (int ic = 0; ic < nChannels; ic++)
-		{
-			// copy to array
-			cudaMemcpy3DParms copyParams = {0};
-			copyParams.srcPtr = make_cudaPitchedPtr(pAccX + (ib * nChannels + ic) * (nx + 1) * ny * nz, nz * sizeof(float), nz, ny);
-			copyParams.dstArray = arrAccX;
-			copyParams.extent = make_cudaExtent(nz, ny, nx + 1);
-			copyParams.kind = cudaMemcpyDeviceToDevice;
-			cudaMemcpy3DAsync(&copyParams, m_stream);
-
-			copyParams.srcPtr = make_cudaPitchedPtr(pAccY + (ib * nChannels + ic) * nx * (ny + 1) * nz, nz * sizeof(float), nz, ny + 1);
-			copyParams.dstArray = arrAccY;
-			copyParams.extent = make_cudaExtent(nz, ny + 1, nx);
-			copyParams.kind = cudaMemcpyDeviceToDevice;
-			cudaMemcpy3DAsync(&copyParams, m_stream);
-
-			DDFPFanKernelX<<<blocksX, threadsX>>>(pcuPrj + ib * nu * nview * nv * nChannels + ic,
-					texAccX, pcuDeg, cuIviewsX, nValidViewsX, nview, nChannels, grid, det, dsd, dso);
-
-			DDFPFanKernelY<<<blocksY, threadsY>>>(pcuPrj + ib * nu * nview * nv * nChannels + ic,
-					texAccY, pcuDeg, cuIviewsY, nValidViewsY, nview, nChannels, grid, det, dsd, dso);
-
-			cudaDeviceSynchronize();
-		}
-	}
-
-
 	if (pAccX != NULL) cudaFree(pAccX);
 	if (pAccY != NULL) cudaFree(pAccY);
 	if (cuIviewsX != NULL) cudaFree(cuIviewsX);
 	if (cuIviewsY != NULL) cudaFree(cuIviewsY);
-	if (arrAccX != NULL) cudaFreeArray(arrAccX);
-	if (arrAccY != NULL) cudaFreeArray(arrAccY);
-	if (texAccX != 0) cudaDestroyTextureObject(texAccX);
-	if (texAccY != 0) cudaDestroyTextureObject(texAccY);
 }
 
-extern "C" void cDistanceDrivenFanProjection(float* prj, const float* img, const float* deg,
-		int nBatches, int nChannels, int nx, int ny, int nz, float dx, float dy, float dz,
-		int nu, int nview, int nv, float da, float dv, float off_a, float off_v,
-		float dsd, float dso, int typeProjector)
+extern "C" int cupyDistanceDrivenFanProjection(float* prj, const float* img, const float* deg,
+	size_t nBatches, 
+	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+	size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
+	float dsd, float dso)
+{
+	try
+	{
+		DistanceDrivenFan projector;
+		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+				nu, nv, nview, da, dv, off_a, off_v, dsd, dso);
+
+		projector.Projection(img, prj, deg);
+	}
+	catch (exception& e)
+	{
+		ostringstream oss;
+		oss << "cupyDistanceDrivenFanProjection() failed: " << e.what() << " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		cerr << oss.str() << endl;
+	}
+
+	return cudaGetLastError();
+}
+
+extern "C" int cDistanceDrivenFanProjection(float* prj, const float* img, const float* deg,
+	size_t nBatches, 
+	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
+	size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
+	float dsd, float dso)
 {
 	float* pcuImg = NULL;
 	float* pcuPrj = NULL;
 	float* pcuDeg = NULL;
 	try
 	{
-		if (cudaSuccess != cudaMalloc(&pcuImg, sizeof(float) * nBatches * nx * ny * nz * nChannels))
+		if (cudaSuccess != cudaMalloc(&pcuImg, sizeof(float) * nBatches * nx * ny * nz))
 		{
 			throw runtime_error("pcuImg allocation failed");
 		}
 
-		if (cudaSuccess != cudaMalloc(&pcuPrj, sizeof(float) * nBatches * nu * nview * nv * nChannels))
+		if (cudaSuccess != cudaMalloc(&pcuPrj, sizeof(float) * nBatches * nu * nv * nview))
 		{
 			throw runtime_error("pcuPrj allocation failed");
 		}
@@ -407,35 +380,39 @@ extern "C" void cDistanceDrivenFanProjection(float* prj, const float* img, const
 		}
 
 		cudaMemcpy(pcuDeg, deg, sizeof(float) * nview, cudaMemcpyHostToDevice);
-		cudaMemcpy(pcuImg, img, sizeof(float) * nBatches * nx * ny * nz * nChannels, cudaMemcpyHostToDevice);
-		cudaMemset(pcuPrj, 0, sizeof(float) * nBatches * nu * nview * nv * nChannels);
+		cudaMemcpy(pcuImg, img, sizeof(float) * nBatches * nx * ny * nz, cudaMemcpyHostToDevice);
+		cudaMemset(pcuPrj, 0, sizeof(float) * nBatches * nu * nv * nview);
+
+		DistanceDrivenFan projector;
+		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+				nu, nv, nview, da, dv, off_a, off_v, dsd, dso);
+
+		projector.Projection(pcuImg, pcuPrj, pcuDeg);
+		cudaMemcpy(prj, pcuPrj, sizeof(float) * nBatches * nu * nv * nview, cudaMemcpyDeviceToHost);
 	}
 	catch (exception &e)
 	{
-		if (pcuImg != NULL) cudaFree(pcuImg);
-		if (pcuPrj != NULL) cudaFree(pcuPrj);
-		if (pcuDeg != NULL) cudaFree(pcuDeg);
-
 		ostringstream oss;
 		oss << "cDistanceDrivenFanProjection failed: " << e.what()
 				<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
-		throw runtime_error(oss.str().c_str());
 	}
 
-	DistanceDrivenFan projector;
-	projector.Setup(nBatches, nChannels, nx, ny, nz, dx, dy, dz,
-			nu, nview, nv, da, dv, off_a, off_v, dsd, dso, typeProjector);
+	if (pcuImg != NULL) cudaFree(pcuImg);
+	if (pcuPrj != NULL) cudaFree(pcuPrj);
+	if (pcuDeg != NULL) cudaFree(pcuDeg);
 
-	projector.Projection(pcuImg, pcuPrj, pcuDeg);
-	cudaMemcpy(prj, pcuPrj, sizeof(float) * nBatches * nu * nview * nv * nChannels, cudaMemcpyDeviceToHost);
-
-	cudaFree(pcuImg);
-	cudaFree(pcuPrj);
-	cudaFree(pcuDeg);
+	return cudaGetLastError();
 
 }
 
+void DistanceDrivenFan::Backprojection(float* pcuImg, const float* pcuPrj, const float* pcuDeg)
+{
+
+}
+
+
+/*
 __global__ void PreweightBPKernelX(float* pPrjs, const float* pDeg, int* iviews, int nValidViews,
 		int nview, int nc, const Detector det, float dy)
 {
@@ -842,3 +819,4 @@ extern "C" void cDistanceDrivenFanBackprojection(float* img, const float* prj, c
 	cudaFree(pcuDeg);
 
 }
+*/

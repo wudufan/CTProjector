@@ -59,6 +59,18 @@ class ct_projector:
     def bp(self, prj):
         return self.backprojector(prj, **(self.bp_kwargs))
     
+    def fp2(self, img, **kwargs):
+        '''
+        Use passed kwargs. Useful for OS iterations
+        '''
+        return self.projector(img, **kwargs)
+    
+    def bp2(self, img, **kwargs):
+        '''
+        Use passed kwargs. Useful for OS iterations
+        '''
+        return self.backprojector(img, **kwargs)
+    
     def calc_projector_norm(self, weight = None, niter=10):
         '''
         Use power method to calculate the norm of the projector
@@ -94,6 +106,9 @@ class ct_projector:
 
     def set_device(self, device):
         return module.SetDevice(c_int(device))
+    
+    def get_angles(self):
+        return np.arange(0, self.nview, dtype=np.float32) * 2 * np.pi / self.nview
     
     def siddon_cone_fp_abitrary(self, img, det_center, det_u, det_v, src):
         '''
@@ -243,3 +258,34 @@ class ct_projector:
             print (err)
 
         return img
+
+    def distance_driven_fan_fp(self, img, angles):
+        '''
+        Fanbeam forward projection with circular equiangular detector. Distance driven.
+        @params:
+        @img: float32 cuarray of size [batch, nz, ny, nx], the image to be projected 
+        @angles: float32 cuarray of size [nview], the projection angles
+
+        @return:
+        @prj: float32 cuarray of size [batch, nview, nv, nu], the forward projection
+        '''
+        prj = cp.zeros([img.shape[0], len(angles), self.nv, self.nu], cp.float32)
+
+        module.cupyDistanceDrivenFanProjection.restype = c_int
+
+        err = module.cupyDistanceDrivenFanProjection(
+            c_void_p(prj.data.ptr), 
+            c_void_p(img.data.ptr),
+            c_void_p(angles.data.ptr),
+            c_ulong(img.shape[0]), 
+            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
+            c_float(self.dx), c_float(self.dy), c_float(self.dz),
+            c_float(self.cx), c_float(self.cy), c_float(self.cz),
+            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
+            c_float(self.du / self.dsd), c_float(self.dv), c_float(self.off_u), c_float(self.off_v), 
+            c_float(self.dsd), c_float(self.dso))
+        
+        if err != 0:
+            print (err)
+        
+        return prj

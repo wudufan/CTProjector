@@ -218,11 +218,11 @@ __device__ float InterpolateXY(const float* buff, float x, float y, int iz, size
 
 
 // 2d interpolation
-__device__ float InterpolateXZ(const float* buff, float x, int iy, float z,, size_t nx, size_t ny, size_t nz, bool truncate)
+__device__ float InterpolateXZ(const float* buff, float x, int iy, float z, size_t nx, size_t ny, size_t nz, bool truncate)
 {
 	if (truncate)
 	{
-		if (x < 0 || x >= nx || z < 0 || y >= nz)
+		if (x < 0 || x >= nx || z < 0 || z >= nz)
 		{
 			return 0;
 		}
@@ -245,9 +245,43 @@ __device__ float InterpolateXZ(const float* buff, float x, int iy, float z,, siz
 	float wx = (x - ix);
 	float wz = (z - iz);
 
-	return float(buff[iz * nx * ny + iy * nx + ix] * (1 - wz) * (1 - wz) +
+	return float(buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wz) +
 				 buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wz) +
 				 buff[iz1 * nx * ny + iy * nx + ix] * (1 - wx) * wz +
 				 buff[iz1 * nx * ny + iy * nx + ix1] * wx * wz);
+
+}
+
+// 2d interpolation
+__device__ float InterpolateYZ(const float* buff, int ix, float y, float z, size_t nx, size_t ny, size_t nz, bool truncate)
+{
+	if (truncate)
+	{
+		if (y < 0 || y >= ny || z < 0 || z >= nz)
+		{
+			return 0;
+		}
+	}
+
+	y = ClampFloat(y, 0, ny);
+	z = ClampFloat(z, 0, nz);
+
+	int iy = int(y);
+	int iz = int(z);
+	int iy1 = iy + 1;
+	int iz1 = iz + 1;
+
+//	ix = Clamp(ix, 0, nx);
+//	iy = Clamp(iy, 0, ny);
+	iy1 = Clamp(iy1, 0, ny);
+	iz1 = Clamp(iz1, 0, nz);
+
+	float wy = (y - iy);
+	float wz = (z - iz);
+
+	return float(buff[iz * nx * ny + iy * nx + ix] * (1 - wy) * (1 - wz) +
+				 buff[iz * nx * ny + iy1 * nx + ix] * wy * (1 - wz) +
+				 buff[iz1 * nx * ny + iy * nx + ix] * (1 - wy) * wz +
+				 buff[iz1 * nx * ny + iy1 * nx + ix] * wy * wz);
 
 }

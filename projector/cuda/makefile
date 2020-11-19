@@ -1,4 +1,4 @@
-objects = cudaMath.o projector.o siddon.o siddonCone.o siddonFan.o distanceDriven3D.o fbp.o
+objects = distanceDrivenFan.o cudaMath.o projector.o siddon.o siddonCone.o siddonFan.o distanceDriven3D.o fbp.o
 OUT = output
 TARGET = libprojector.so
 
