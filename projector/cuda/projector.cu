@@ -47,7 +47,7 @@ Projector::Projector()
 
 Projector::~Projector()
 {
-
+	this->Free();
 }
 
 void Projector::SetCudaStream(const cudaStream_t& stream)

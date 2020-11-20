@@ -136,6 +136,11 @@ public:
 	void SetCudaStream(const cudaStream_t& stream);
 
 public:
+	// allocate all the needed memory in advance for tensorflow compatibility
+	virtual void Allocate(bool forward = true, bool backward = true) {};
+	virtual void Free() {};
+
+public:
 	virtual void Projection(const float* pcuImg, float* pcuPrj, const float* pcuDeg) {};
 	virtual void Backprojection(float* pcuImg, const float* pcuPrj, const float* pcuDeg) {};
 

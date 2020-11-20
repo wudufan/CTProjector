@@ -15,12 +15,28 @@ The cuda kernel accept float32 type array unless specified otherwise. A type cas
 - `projector/ct_projector.py` provides C-routine calls. It accepts numpy arrays and return numpy arrays. 
 - `projector/ct_projector_cupy.py` provides cupy-routine calls. It accepts cupy arrays and return cupy arrays, so that there is no memory transfer overhead. This routine is recommended if GPU memory is enough. Cupy also provides most of the neccessary matrix operations for image reconstruction, so it could accelerate the reconstruction a lot by keeping every operation in the GPU. 
 
-## Existing module
+## Existing Modules
 
-Beam | Detector | Trajectory | Algorithm | Comments 
+By tf-compatible, it means that the module is programmed to: 
+- Have separate memory allocation and free functions, so that all the needed GPU memory can be allocated by Tensorflow API
+- Have considered cuda stream in the function calls
+
+Beam | Detector | Trajectory | Algorithm | tf-compatible | Comments 
+---- | ---- | ---- | ---- | ---- | ----
+Conebeam| Flat panel| Abitrary | Siddon | No | None
+Conebeam| Flat panel| Tomosynthesis | Distance-driven | No | The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
+Fanbeam | Equiangular| Circular | Siddon | No | numpy-only
+Fanbeam | Equiangular| Circular | FBP | No | numpy-only. Filter + pixel-driven BP
+Fanbeam | Equiangular| Circular | Distance-driven | Yes | cupy-only
+
+## Existing Priors
+
+Name | Supported denoising method | Supported priors | Supported algorithms | Comments
 ---- | ---- | ---- | ---- | ----
-Conebeam| Flat panel| Abitrary | Siddon | None
-Conebeam| Flat panel| Tomosynthesis | Distance-driven| The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
-Fanbeam | Equiangular| Circular | Siddon | numpy-only
-Fanbeam | Equiangular| Circular | FBP | numpy-only. Filter + pixel-driven BP.
-Fanbeam | Equiangular| Circular | Distance-driven | cupy-only
+nlm | (Guided) Non-local mean | Gaussian | SQS | Needed component for Gaussian in SQS can be realized by calling nlm
+
+## Existing Reconstruction Algorithms
+
+Name | Comments
+---- | ----
+sqs_gaussian | cupy only

@@ -3,8 +3,29 @@
 class DistanceDrivenFan: public Projector
 {
 public:
-	DistanceDrivenFan(): Projector() {}
-	~DistanceDrivenFan() {}
+	// memories needed
+	float* pAccX;
+	float* pAccY;
+	float* pAccU;
+	float* pWeightedPrjs;
+
+public:
+	DistanceDrivenFan(): Projector() 
+	{
+		this->pAccX = NULL;
+		this->pAccY = NULL;
+		this->pAccU = NULL;
+		this->pWeightedPrjs = NULL;
+
+	}
+	~DistanceDrivenFan() 
+	{ 
+		this->Free(); 
+	}
+
+public:
+	void Allocate(bool forward = true, bool backward = true) override;
+	void Free() override;
 
 public:
 	void Projection(const float* pcuImg, float* pcuPrj, const float* pcuDeg) override;

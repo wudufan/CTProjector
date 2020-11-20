@@ -65,11 +65,11 @@ class ct_projector:
         '''
         return self.projector(img, **kwargs)
     
-    def bp2(self, img, **kwargs):
+    def bp2(self, prj, **kwargs):
         '''
         Use passed kwargs. Useful for OS iterations
         '''
-        return self.backprojector(img, **kwargs)
+        return self.backprojector(prj, **kwargs)
     
     def calc_projector_norm(self, weight = None, niter=10):
         '''
@@ -289,3 +289,40 @@ class ct_projector:
             print (err)
         
         return prj
+    
+    def distance_driven_fan_bp(self, prj, angles, is_fbp = False):
+        '''
+        Fanbeam backprojection with circular equiangular detector. Distance driven
+        @params:
+        @prj: cuarray of shape [batch, nview , nv, nu], the projection to be backprojected
+        @angles: cuarray of shape [nview], the projection angles in rads
+        @is_fbp: is True, use the FBP weighting scheme rather than iterative recon weighting
+
+        @return:
+        @img: cuarray of shape [batch, nz, ny, nx], the backprojected image
+        '''
+
+        img = cp.zeros([prj.shape[0], self.nz, self.ny, self.nx], cp.float32)
+        if is_fbp: 
+            type_projector = 1
+        else:
+            type_projector = 0
+
+        module.cupyDistanceDrivenFanBackprojection.restype = c_int
+
+        err = module.cupyDistanceDrivenFanBackprojection(
+            c_void_p(img.data.ptr), 
+            c_void_p(prj.data.ptr),
+            c_void_p(angles.data.ptr),
+            c_ulong(img.shape[0]), 
+            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
+            c_float(self.dx), c_float(self.dy), c_float(self.dz),
+            c_float(self.cx), c_float(self.cy), c_float(self.cz),
+            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
+            c_float(self.du / self.dsd), c_float(self.dv), c_float(self.off_u), c_float(self.off_v), 
+            c_float(self.dsd), c_float(self.dso), c_int(type_projector))
+        
+        if err != 0:
+            print (err)
+        
+        return img
