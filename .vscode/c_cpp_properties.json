@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "tensorflow user op",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/projector/cuda",
+                "/home/local/PARTNERS/dw640/miniconda3/envs/dbt_dev/lib/python3.7/site-packages/tensorflow_core/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "gcc-x64"
+        }
+    ],
+    "version": 4
+}

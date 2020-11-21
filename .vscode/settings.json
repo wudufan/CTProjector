@@ -1,3 +1,19 @@
 {
-    "python.pythonPath": "/home/dwu/anaconda3/envs/tf2.2/bin/python"
+    "python.pythonPath": "/home/local/PARTNERS/dw640/miniconda3/envs/dbt_dev/bin/python",
+    "files.associations": {
+        "*.tcc": "cpp",
+        "bitset": "cpp",
+        "algorithm": "cpp",
+        "memory": "cpp",
+        "random": "cpp",
+        "fstream": "cpp",
+        "iosfwd": "cpp",
+        "iostream": "cpp",
+        "istream": "cpp",
+        "ostream": "cpp",
+        "numeric": "cpp",
+        "ratio": "cpp",
+        "sstream": "cpp",
+        "streambuf": "cpp"
+    }
 }

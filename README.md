@@ -23,7 +23,7 @@ By tf-compatible, it means that the module is programmed to:
 
 Beam | Detector | Trajectory | Algorithm | tf-compatible | Comments 
 ---- | ---- | ---- | ---- | ---- | ----
-Conebeam| Flat panel| Abitrary | Siddon | No | None
+Conebeam| Flat panel| Abitrary | Siddon | Yes | None
 Conebeam| Flat panel| Tomosynthesis | Distance-driven | No | The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
 Fanbeam | Equiangular| Circular | Siddon | No | numpy-only
 Fanbeam | Equiangular| Circular | FBP | No | numpy-only. Filter + pixel-driven BP
