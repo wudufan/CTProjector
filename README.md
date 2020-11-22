@@ -33,7 +33,7 @@ distance_driven_fan_fp(bp) | Fanbeam | Equiangular| Circular | Distance-driven |
 ## Tensorflow Modules
 
 Name | Beam | Detector | Trajectory | Algorithm | Comments 
----- | ---- | ---- | ---- | ---- | ---- | ----
+---- | ---- | ---- | ---- | ---- | ---- 
 siddon_cone_fp(bp)_abitrary | Conebeam| Flat panel| Abitrary | Siddon | None
 
 ## Priors
