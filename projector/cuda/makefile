@@ -1,13 +1,41 @@
-objects = distanceDrivenFan.o cudaMath.o projector.o siddon.o siddonCone.o siddonFan.o distanceDriven3D.o fbp.o
-OUT = output
-TARGET = libprojector.so
+OUT = ./output
+DST = ..
+TARGET = libprojector
+GPUCODE_TARGET = ${OUT}/${TARGET}.gpu.o
+SHARED_TARGET = ${OUT}/${TARGET}.so
+STATIC_TARGET = ${OUT}/${TARGET}.a
 
-all: $(objects)
-	cd ${OUT}; \
-	nvcc --shared $(objects) --gpu-architecture=sm_70 -lcufft -o ${TARGET}
-	cp ${OUT}/${TARGET} ../${TARGET}
+SOURCES := $(wildcard *.cu)
+OBJECTS := $(addprefix ${OUT}/,$(patsubst %.cu,%.o,$(SOURCES)))
+DEPENDS := $(addprefix ${OUT}/,$(patsubst %.cu,%.d,$(SOURCES)))
 
-%.o: %.cu
-	nvcc -O3 --gpu-architecture=sm_70 --compiler-options '-fPIC' -I.. -dc $< -o ${OUT}/$@
+.PHONY: all shared static clean
+
+all: shared static
+
+shared: ${SHARED_TARGET}
+
+static: ${STATIC_TARGET}
+
+# shared library for python
+${SHARED_TARGET}: ${OBJECTS}
+	nvcc --shared $(OBJECTS) -arch=sm_70 -lcufft -o ${SHARED_TARGET}
+	cp ${SHARED_TARGET} ${DST}/${TARGET}.so
+
+# static library for tensorflow
+${STATIC_TARGET}: $(OBJECTS)
+	nvcc -arch=sm_70 -dlink $(OBJECTS) --compiler-options '-fPIC' -o ${GPUCODE_TARGET}
+	ar rcs ${STATIC_TARGET} $(OBJECTS) ${GPUCODE_TARGET}
+
+# header dependency
+-include $(DEPENDS)
+
+# compile
+${OUT}/%.o: %.cu
+	nvcc -E --compiler-options '-MM -MF $(patsubst %.o,%.d,$@) -MT $@ -MP' $<
+	nvcc -O3 -arch=sm_70 -I.. -dc --compiler-options '-fPIC' $< -o $@
+
+clean: 
+	-rm -f ${OBJECTS} ${STATIC_TARGET} ${SHARED_TARGET} ${GPUCODE_TARGET} ${DEPENDS}
 
 $(shell mkdir -p $(OUT))

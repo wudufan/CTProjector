@@ -14,28 +14,35 @@ The cuda kernel accept float32 type array unless specified otherwise. A type cas
 ## Python Interface
 - `projector/ct_projector.py` provides C-routine calls. It accepts numpy arrays and return numpy arrays. 
 - `projector/ct_projector_cupy.py` provides cupy-routine calls. It accepts cupy arrays and return cupy arrays, so that there is no memory transfer overhead. This routine is recommended if GPU memory is enough. Cupy also provides most of the neccessary matrix operations for image reconstruction, so it could accelerate the reconstruction a lot by keeping every operation in the GPU. 
+- `projector/ct_projector_tensorflow.py` provides tensorflow modules. Most of the parameters can be pre-set or pass during computation. A default output shape should be passed if shape inference is needed. 
 
-## Existing Modules
+## Modules
 
 By tf-compatible, it means that the module is programmed to: 
 - Have separate memory allocation and free functions, so that all the needed GPU memory can be allocated by Tensorflow API
 - Have considered cuda stream in the function calls
 
-Beam | Detector | Trajectory | Algorithm | tf-compatible | Comments 
----- | ---- | ---- | ---- | ---- | ----
-Conebeam| Flat panel| Abitrary | Siddon | Yes | None
-Conebeam| Flat panel| Tomosynthesis | Distance-driven | No | The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
-Fanbeam | Equiangular| Circular | Siddon | No | numpy-only
-Fanbeam | Equiangular| Circular | FBP | No | numpy-only. Filter + pixel-driven BP
-Fanbeam | Equiangular| Circular | Distance-driven | Yes | cupy-only
+Name | Beam | Detector | Trajectory | Algorithm | tf-compatible | Comments 
+---- | ---- | ---- | ---- | ---- | ---- | ----
+siddon_cone_fp(bp)_abitrary | Conebeam| Flat panel| Abitrary | Siddon | Yes | None
+distance_driven_fp(bp)_tomo | Conebeam| Flat panel| Tomosynthesis | Distance-driven | No | The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
+siddon_fan_fp(bp) | Fanbeam | Equiangular| Circular | Siddon | No | numpy-only
+ramp_filter/fbp_fan_bp | Fanbeam | Equiangular| Circular | FBP | No | numpy-only. Filter + pixel-driven BP
+distance_driven_fan_fp(bp) | Fanbeam | Equiangular| Circular | Distance-driven | Yes | cupy-only
 
-## Existing Priors
+## Tensorflow Modules
+
+Name | Beam | Detector | Trajectory | Algorithm | Comments 
+---- | ---- | ---- | ---- | ---- | ---- | ----
+siddon_cone_fp(bp)_abitrary | Conebeam| Flat panel| Abitrary | Siddon | None
+
+## Priors
 
 Name | Supported denoising method | Supported priors | Supported algorithms | Comments
 ---- | ---- | ---- | ---- | ----
 nlm | (Guided) Non-local mean | Gaussian | SQS | Needed component for Gaussian in SQS can be realized by calling nlm
 
-## Existing Reconstruction Algorithms
+## Reconstruction Algorithms
 
 Name | Comments
 ---- | ----

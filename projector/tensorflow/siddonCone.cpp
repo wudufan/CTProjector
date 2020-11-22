@@ -125,7 +125,7 @@ default_shape: the default shape of the projection. when -1 is passed to any dim
     It is useful for shape inference. 
 
 Inputs:
-img: tensor of shape [batch, nz, ny, nx]. Python should handle the shape conversion.
+image: tensor of shape [batch, nz, ny, nx]. Python should handle the shape conversion.
 geometry: tensor of shape [nview * 4, 3]. It is the concatenation of [detCenter, detU, detV, src], each with the shape of [nview, 3].
 grid: tensor of length 6. each parameter is (dx, dy, dz, cx, cy, cz), all in mm
 detector: tensor of length 4. each parameter is (du, dv, off_u, off_v), with units (mm, mm, pixel, pixel)
@@ -138,7 +138,7 @@ projection: tensor of shape [batch, nview, nv, nu]. Python should handle the sha
 // 
 REGISTER_OP("SiddonConeFP")
     .Attr("default_shape: list(int) >= 3")
-    .Input("img: float")
+    .Input("image: float")
     .Input("geometry: float")
     .Input("grid: float")
     .Input("detector: float")
@@ -182,9 +182,12 @@ public:
 
     void Compute(OpKernelContext* context) override
     {
+        const cudaStream_t& stream = context->eigen_gpu_device().stream();
+
         // Grab the input tensors
         const Tensor& imgTensor = context->input(0);
         const Tensor& geoTensor = context->input(1);
+        const float3* ptrGeo = (const float3*)geoTensor.flat<float>().data();
 
         // Create an output tensor
         TensorShape prjShape;
@@ -192,15 +195,146 @@ public:
         Tensor* prjTensor = NULL;
         OP_REQUIRES_OK(context, context->allocate_output(0, prjShape, &prjTensor));
 
+        // memory initialization
+        cudaMemsetAsync(prjTensor->flat<float>().data(), 0, sizeof(float) * prjTensor->NumElements(), stream);
+
         // grid and detector
         Grid grid;
         Detector det;
         this->getGrid(grid, imgTensor.shape(), context);
         this->getDetector(det, prjTensor->shape(), context);
         
+        // validation
+        OP_REQUIRES(context, geoTensor.dim_size(0) == prjTensor->dim_size(1) * 4, errors::InvalidArgument("geometry.shape[0] must equal to nview*4"));
+
+        // setup projector
+        SiddonCone* projector = (SiddonCone*)(this->ptrProjector);
+        projector->Setup(imgTensor.dim_size(0), imgTensor.dim_size(3), imgTensor.dim_size(2), imgTensor.dim_size(1),
+                         grid.dx, grid.dy, grid.dz, grid.cx, grid.cy, grid.cz, 
+                         prjTensor->dim_size(3), prjTensor->dim_size(2), prjTensor->dim_size(1), det.du, det.dv, det.off_u, det.off_v, 0, 0);
+        projector->SetCudaStream(stream);
+
+        // forward projection
+        int nview = prjTensor->dim_size(1);
+        cudaStreamSynchronize(stream);
+        projector->ProjectionAbitrary(imgTensor.flat<float>().data(), 
+                                      prjTensor->flat<float>().data(), 
+                                      ptrGeo, ptrGeo + nview, ptrGeo + nview * 2, ptrGeo + nview * 3);
     }
 
 
 };
 
 REGISTER_KERNEL_BUILDER(Name("SiddonConeFP").Device(DEVICE_GPU), SiddonConeFPOp<GPUDevice>);
+
+
+/*
+
+Siddon cone backward projection tensorflow op
+
+Attributes:
+default_shape: the default shape of the image. when -1 is passed to any dimension of default_shape, use the corresponding dimension of output_shape passed on-the-fly.
+    It is useful for shape inference. 
+
+Inputs:
+prj: tensor of shape [batch, nview, nv, nu]. Python should handle the shape conversion.
+geometry: tensor of shape [nview * 4, 3]. It is the concatenation of [detCenter, detU, detV, src], each with the shape of [nview, 3].
+grid: tensor of length 6. each parameter is (dx, dy, dz, cx, cy, cz), all in mm
+detector: tensor of length 4. each parameter is (du, dv, off_u, off_v), with units (mm, mm, pixel, pixel)
+output_shape: tensorflow of length 3, each parameter is (nview, nv, nu). It is combined with default_shape for the final projection allocation.
+
+Outputs:
+image: tensor of shape [batch, nz, ny, nx]. Python should handle the shape conversion.
+
+*/
+// 
+REGISTER_OP("SiddonConeBP")
+    .Attr("default_shape: list(int) >= 3")
+    .Input("projection: float")
+    .Input("geometry: float")
+    .Input("grid: float")
+    .Input("detector: float")
+    .Input("output_shape: int32")
+    .Output("image: float")
+    .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c){
+        // check the input rank must be 4
+        ::tensorflow::shape_inference::ShapeHandle input;
+        TF_RETURN_IF_ERROR(c->WithRank(c->input(0), 4, &input));
+
+        vector<int> defaultShape;
+        TF_RETURN_IF_ERROR(c->GetAttr("default_shape", &defaultShape));
+
+        std::vector<DimensionHandle> outputDim;
+        outputDim.push_back(c->Dim(c->input(0), 0)); // batch * channel
+        for (int i = 0; i < 3; i++)
+        {
+            outputDim.push_back(c->MakeDim(defaultShape[i]));	// nz, ny, nx
+        }
+
+        c->set_output(0, c->MakeShape(outputDim));
+        return Status::OK();
+    });
+
+template <typename Device>
+class SiddonConeBPOp : public ProjectorBase<Device>
+{
+public:
+    explicit SiddonConeBPOp(OpKernelConstruction* context) : ProjectorBase<Device>(context) 
+    {
+        this->ptrProjector = new SiddonCone;
+    }
+
+    virtual ~SiddonConeBPOp()
+	{
+		if (this->ptrProjector != NULL)
+		{
+			delete this->ptrProjector;
+		}
+	}
+
+    void Compute(OpKernelContext* context) override
+    {
+        const cudaStream_t& stream = context->eigen_gpu_device().stream();
+
+        // Grab the input tensors
+        const Tensor& prjTensor = context->input(0);
+        const Tensor& geoTensor = context->input(1);
+        const float3* ptrGeo = (const float3*)geoTensor.flat<float>().data();
+
+        // Create an output tensor
+        TensorShape imgShape;
+        this->getOutputShape(imgShape, context);
+        Tensor* imgTensor = NULL;
+        OP_REQUIRES_OK(context, context->allocate_output(0, imgShape, &imgTensor));
+
+        // memory initialization
+        cudaMemsetAsync(imgTensor->flat<float>().data(), 0, sizeof(float) * imgTensor->NumElements(), stream);
+
+        // grid and detector
+        Grid grid;
+        Detector det;
+        this->getGrid(grid, imgTensor->shape(), context);
+        this->getDetector(det, prjTensor.shape(), context);
+        
+        // validation
+        OP_REQUIRES(context, geoTensor.dim_size(0) == prjTensor.dim_size(1) * 4, errors::InvalidArgument("geometry.shape[0] must equal to nview*4"));
+
+        // setup projector
+        SiddonCone* projector = (SiddonCone*)(this->ptrProjector);
+        projector->Setup(imgTensor->dim_size(0), imgTensor->dim_size(3), imgTensor->dim_size(2), imgTensor->dim_size(1),
+                         grid.dx, grid.dy, grid.dz, grid.cx, grid.cy, grid.cz, 
+                         prjTensor.dim_size(3), prjTensor.dim_size(2), prjTensor.dim_size(1), det.du, det.dv, det.off_u, det.off_v, 0, 0);
+        projector->SetCudaStream(stream);
+
+        // backprojection
+        int nview = prjTensor.dim_size(1);
+        cudaStreamSynchronize(stream);
+        projector->BackprojectionAbitrary(imgTensor->flat<float>().data(), 
+                                          prjTensor.flat<float>().data(), 
+                                          ptrGeo, ptrGeo + nview, ptrGeo + nview * 2, ptrGeo + nview * 3);
+    }
+
+
+};
+
+REGISTER_KERNEL_BUILDER(Name("SiddonConeBP").Device(DEVICE_GPU), SiddonConeBPOp<GPUDevice>);

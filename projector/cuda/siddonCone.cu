@@ -86,7 +86,7 @@ void SiddonCone::ProjectionAbitrary(const float* pcuImg, float* pcuPrj, const fl
 				MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz)
 				);
 
-		cudaDeviceSynchronize();
+		cudaStreamSynchronize(m_stream);
 	}
 
 }
@@ -111,7 +111,7 @@ void SiddonCone::BackprojectionAbitrary(float* pcuImg, const float* pcuPrj, cons
 				MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz)
 				);
 
-		cudaDeviceSynchronize();
+		cudaStreamSynchronize(m_stream);
 	}
 }
 
