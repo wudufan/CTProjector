@@ -34,5 +34,20 @@ def sqs_gaussian_one_step(projector, img, prj, norm_img, projector_norm, beta, w
     else:
         return img
 
+def nesterov_acceleration(func, img, img_nesterov, nesterov = 0.5, **kwargs):
+    '''
+    kwargs should contains all params for func except for img. func should return img as the only or the first return value
+    '''
 
+    kwargs['img'] = img_nesterov
+    res = func(**kwargs)
+
+    if type(res) is tuple:
+        img_nesterov = res[0] + nesterov * (res[0] - img_nesterov)
+        img = res[0]
+    else:
+        img_nesterov = res + nesterov * (res - img_nesterov)
+        img = res
+    
+    return img, img_nesterov
 

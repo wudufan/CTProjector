@@ -326,3 +326,29 @@ class ct_projector:
             print (err)
         
         return img
+    
+    def filter_tomo(self, prj, det_center, src, filter_type = 'hann', cutoff_x = 1, cutoff_y = 1):
+        if filter_type.lower() == 'hamming':
+            ifilter = 1
+        elif filter_type.lower() == 'hann':
+            ifilter = 2
+        else:
+            ifilter = 0
+
+        fprj = cp.zeros(prj.shape, cp.float32)
+
+        module.cupyFbpTomoFilter.restype = c_int
+        err = module.cupyFbpTomoFilter(
+            c_void_p(fprj.data.ptr), 
+            c_void_p(prj.data.ptr), 
+            c_void_p(det_center.data.ptr), 
+            c_void_p(src.data.ptr),
+            c_ulong(prj.shape[0]),
+            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]), 
+            c_float(self.du), c_float(self.dx), c_float(self.dz),
+            c_int(ifilter), c_float(cutoff_x), c_float(cutoff_y))
+        
+        if err != 0:
+            print (err)
+
+        return fprj
