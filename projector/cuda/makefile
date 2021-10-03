@@ -19,12 +19,12 @@ static: ${STATIC_TARGET}
 
 # shared library for python
 ${SHARED_TARGET}: ${OBJECTS}
-	nvcc --shared $(OBJECTS) -arch=sm_70 -lcufft -o ${SHARED_TARGET}
+	nvcc --shared $(OBJECTS) -arch=sm_75 -lcufft -o ${SHARED_TARGET}
 	cp ${SHARED_TARGET} ${DST}/${TARGET}.so
 
 # static library for tensorflow
 ${STATIC_TARGET}: $(OBJECTS)
-	nvcc -arch=sm_70 -dlink $(OBJECTS) --compiler-options '-fPIC' -o ${GPUCODE_TARGET}
+	nvcc -arch=sm_75 -dlink $(OBJECTS) --compiler-options '-fPIC' -o ${GPUCODE_TARGET}
 	ar rcs ${STATIC_TARGET} $(OBJECTS) ${GPUCODE_TARGET}
 
 # header dependency
@@ -33,7 +33,7 @@ ${STATIC_TARGET}: $(OBJECTS)
 # compile
 ${OUT}/%.o: %.cu
 	nvcc -E --compiler-options '-MM -MF $(patsubst %.o,%.d,$@) -MT $@ -MP' $<
-	nvcc -O3 -arch=sm_70 -I.. -dc --compiler-options '-fPIC' $< -o $@
+	nvcc -O3 -arch=sm_75 -I.. -dc --compiler-options '-fPIC' $< -o $@
 
 clean: 
 	-rm -f ${OBJECTS} ${STATIC_TARGET} ${SHARED_TARGET} ${GPUCODE_TARGET} ${DEPENDS}
