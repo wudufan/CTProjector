@@ -14,7 +14,7 @@ def nlm(img, guide, d, search_size, kernel_size, kernel_std, eps=1e-6):
     @params:
     @img - the image to be denoised
     @guide - the guide image for nlm.
-    @d - larger the d, the weaker the guide. d should be estimated based on the noise level of guide. 
+    @d - larger the d, the weaker the guide. d should be estimated based on the noise level of guide.
     @search_size - the search window size for averaging
     @kernel_size - the gaussian kernel size to calculate distance between two points.
     @kernel_std - std of the gaussian kernel
