@@ -1,3 +1,11 @@
+# gpu code generation
+# The default here are: P100, GTX 1080 and similar, V100, RTX2080 and similar
+GPU_CODE_FLAG= \
+-gencode=arch=compute_60,code=sm_60 \
+-gencode=arch=compute_61,code=sm_61 \
+-gencode=arch=compute_70,code=sm_70 \
+-gencode=arch=compute_75,code=sm_75
+
 OUT = ./output
 DST = ..
 TARGET = libprojector
@@ -19,12 +27,12 @@ static: ${STATIC_TARGET}
 
 # shared library for python
 ${SHARED_TARGET}: ${OBJECTS}
-	nvcc --shared $(OBJECTS) -arch=sm_75 -lcufft -o ${SHARED_TARGET}
+	nvcc --shared $(OBJECTS) ${GPU_CODE_FLAG} -lcufft -o ${SHARED_TARGET}
 	cp ${SHARED_TARGET} ${DST}/${TARGET}.so
 
 # static library for tensorflow
 ${STATIC_TARGET}: $(OBJECTS)
-	nvcc -arch=sm_75 -dlink $(OBJECTS) --compiler-options '-fPIC' -o ${GPUCODE_TARGET}
+	nvcc ${GPU_CODE_FLAG} -dlink $(OBJECTS) --compiler-options '-fPIC' -o ${GPUCODE_TARGET}
 	ar rcs ${STATIC_TARGET} $(OBJECTS) ${GPUCODE_TARGET}
 
 # header dependency
@@ -33,7 +41,7 @@ ${STATIC_TARGET}: $(OBJECTS)
 # compile
 ${OUT}/%.o: %.cu
 	nvcc -E --compiler-options '-MM -MF $(patsubst %.o,%.d,$@) -MT $@ -MP' $<
-	nvcc -O3 -arch=sm_75 -I.. -dc --compiler-options '-fPIC' $< -o $@
+	nvcc -O3 ${GPU_CODE_FLAG} -I.. -dc --compiler-options '-fPIC' $< -o $@
 
 clean: 
 	-rm -f ${OBJECTS} ${STATIC_TARGET} ${SHARED_TARGET} ${GPUCODE_TARGET} ${DEPENDS}

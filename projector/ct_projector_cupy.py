@@ -1,13 +1,18 @@
-from ctypes import *
+from ctypes import cdll, c_int, c_void_p, c_ulong, c_float
+from typing import Callable
+
 import os
 import cupy as cp
 import numpy as np
-import re
 import configparser
 
 module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprojector.so'))
 
+
 class ct_projector:
+    '''
+    CT projector wrapper
+    '''
     def __init__(self):
         self.nview = 720
         self.nu = 512
@@ -28,7 +33,10 @@ class ct_projector:
         self.off_u = 0
         self.off_v = 0
 
-    def from_file(self, filename):
+    def from_file(self, filename: str):
+        '''
+        Load the geometry from config filename.
+        '''
         self.geometry = configparser.ConfigParser()
         _ = self.geometry.read(filename)
 
@@ -44,34 +52,49 @@ class ct_projector:
         self.nx = int(self.nx)
         self.ny = int(self.ny)
         self.nz = int(self.nz)
-    
-    def set_projector(self, projector, **kwargs):
+
+    def set_projector(self, projector: Callable[..., cp.array], **kwargs):
+        '''
+        Set the projector. The projector will be called as projector(img, **kwargs)
+
+        Parameters
+        -----------------
+        projector: callback function.
+            It takes the first parameter a cp.array image, and the rest parameters given by **kwargs.
+            The return value should be the forward projections in cp.array.
+        **kwargs: parameters.
+            kwargs to be parsed when calling the projector. For example, one can pass what filters
+            should be used for a filter-backprojector.
+        '''
         self.projector = projector
         self.fp_kwargs = kwargs
-    
+
     def set_backprojector(self, backprojector, **kwargs):
+        '''
+        Set the backprojector. So that the bp can be called by bp/bp2.
+        '''
         self.backprojector = backprojector
         self.bp_kwargs = kwargs
-    
+
     def fp(self, img):
         return self.projector(img, **(self.fp_kwargs))
-    
+
     def bp(self, prj):
         return self.backprojector(prj, **(self.bp_kwargs))
-    
+
     def fp2(self, img, **kwargs):
         '''
         Use passed kwargs. Useful for OS iterations
         '''
         return self.projector(img, **kwargs)
-    
+
     def bp2(self, prj, **kwargs):
         '''
         Use passed kwargs. Useful for OS iterations
         '''
         return self.backprojector(prj, **kwargs)
-    
-    def calc_projector_norm(self, weight = None, niter=10):
+
+    def calc_projector_norm(self, weight=None, niter=10):
         '''
         Use power method to calculate the norm of the projector
         '''
@@ -79,77 +102,92 @@ class ct_projector:
             weight = cp.sqrt(weight)
         else:
             weight = 1
-        
-        x = cp.random.uniform(size = [1, self.nz, self.ny, self.nx], dtype=cp.float32)
+
+        x = cp.random.uniform(size=[1, self.nz, self.ny, self.nx], dtype=cp.float32)
         x = x / cp.linalg.norm(x)
 
         for i in range(niter):
-            print (i, end=',', flush=True)
+            print(i, end=',', flush=True)
             fp = self.fp(x)
             norm = cp.linalg.norm(fp)
             x = self.bp(fp * weight)
 
             x = x / cp.linalg.norm(x)
-        print ('')
+        print('')
 
         return norm
-        
-    def calc_norm_img(self, weight = None):
+
+    def calc_norm_img(self, weight=None):
         '''
         Calculate norm_img = A.T*w*A*1
         '''
         if weight is None:
             weight = 1
-        
+
         x = cp.ones([1, self.nz, self.ny, self.nx], dtype=cp.float32)
         return self.bp(self.fp(x) * weight)
 
     def set_device(self, device):
         return module.SetDevice(c_int(device))
-    
+
     def get_angles(self):
         return np.arange(0, self.nview, dtype=np.float32) * 2 * np.pi / self.nview
-    
+
     def siddon_cone_fp_abitrary(self, img, det_center, det_u, det_v, src):
         '''
-        Conebeam forward projection with abitrary geomety and flat panel. Using Siddon ray tracing
-        @params:
-        @img: the image to be projected, of size [batch, nz, ny, nx]
+        Conebeam forward projection with abitrary geomety and flat panel. Using Siddon ray tracing.
+
+        Parameters
+        -------------------------
+        img: 
+        the image to be projected, of size [batch, nz, ny, nx]
         @det_center: the center of the detector in mm, of size [nview, 3]
         @det_u: the u axis of the detector, normalized, of size [nview, 3]
         @det_v: the v axis of the detector, normalized, of size [nview, 3]
         @src: the src positions, in mm, of size [nview, 3]
-        
+
         @return: 
         @prj: the forward projection, of size [batch, nview, self.nv, self.nu]
-        
+
         batch, nx, ny, nz, nview will be automatically derived from the parameters. The projection size should be set by self.nu and self.nv
         '''
-        
-        # projection of size 
+
+        # projection of size
         prj = cp.zeros([img.shape[0], det_center.shape[0], self.nv, self.nu], cp.float32)
-        
+
         module.cupySiddonConeProjectionAbitrary.restype = c_int
 
         err = module.cupySiddonConeProjectionAbitrary(
-            c_void_p(prj.data.ptr), 
-            c_void_p(img.data.ptr), 
-            c_void_p(det_center.data.ptr), 
-            c_void_p(det_u.data.ptr), 
-            c_void_p(det_v.data.ptr), 
+            c_void_p(prj.data.ptr),
+            c_void_p(img.data.ptr),
+            c_void_p(det_center.data.ptr),
+            c_void_p(det_u.data.ptr),
+            c_void_p(det_v.data.ptr),
             c_void_p(src.data.ptr),
-            c_ulong(img.shape[0]), 
-            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
-            c_float(self.dx), c_float(self.dy), c_float(self.dz),
-            c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
-            c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
-        
+            c_ulong(img.shape[0]),
+            c_ulong(img.shape[3]),
+            c_ulong(img.shape[2]),
+            c_ulong(img.shape[1]),
+            c_float(self.dx),
+            c_float(self.dy),
+            c_float(self.dz),
+            c_float(self.cx),
+            c_float(self.cy),
+            c_float(self.cz),
+            c_ulong(prj.shape[3]),
+            c_ulong(prj.shape[2]),
+            c_ulong(prj.shape[1]),
+            c_float(self.du),
+            c_float(self.dv),
+            c_float(self.off_u),
+            c_float(self.off_v)
+        )
+
         if err != 0:
-            print (err)
-        
+            print(err)
+
         return prj
-    
+
     def siddon_cone_bp_abitrary(self, prj, det_center, det_u, det_v, src):
         '''
         Conebeam backprojection with abitrary geomety and flat panel. Using Siddon ray tracing
@@ -160,7 +198,7 @@ class ct_projector:
         @det_v: the v axis of the detector, normalized, of size [nview, 3]
         @src: the src positions, in mm, of size [nview, 3]
         
-        @return: 
+        @return:
         @img: the backprojection, of size [batch, self.nz, self.ny, self.nx]
         
         batch, nu, nv, nview will be automatically derived from the parameters. The image size should be set by self.nx, self.ny, and self.nz
@@ -174,24 +212,36 @@ class ct_projector:
         module.cupySiddonConeBackprojectionAbitrary.restype = c_int
 
         err = module.cupySiddonConeBackprojectionAbitrary(
-            c_void_p(img.data.ptr), 
-            c_void_p(prj.data.ptr), 
-            c_void_p(det_center.data.ptr), 
-            c_void_p(det_u.data.ptr), 
-            c_void_p(det_v.data.ptr), 
+            c_void_p(img.data.ptr),
+            c_void_p(prj.data.ptr),
+            c_void_p(det_center.data.ptr),
+            c_void_p(det_u.data.ptr),
+            c_void_p(det_v.data.ptr),
             c_void_p(src.data.ptr),
-            c_ulong(img.shape[0]), 
-            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
-            c_float(self.dx), c_float(self.dy), c_float(self.dz),
-            c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
-            c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
-        
+            c_ulong(img.shape[0]),
+            c_ulong(img.shape[3]),
+            c_ulong(img.shape[2]),
+            c_ulong(img.shape[1]),
+            c_float(self.dx),
+            c_float(self.dy),
+            c_float(self.dz),
+            c_float(self.cx),
+            c_float(self.cy),
+            c_float(self.cz),
+            c_ulong(prj.shape[3]),
+            c_ulong(prj.shape[2]),
+            c_ulong(prj.shape[1]),
+            c_float(self.du),
+            c_float(self.dv),
+            c_float(self.off_u),
+            c_float(self.off_v)
+        )
+
         if err != 0:
-            print (err)
+            print(err)
 
         return img
-    
+
     def distance_driven_fp_tomo(self, img, det_center, src):
         '''
         Distance driven forward projection for tomosynthesis. It assumes that the detector has u=(1,0,0) and v = (0,1,0).
@@ -204,27 +254,39 @@ class ct_projector:
 
         @return:
         @prj: the forward projection of size (batch, nview, nv, nu)
-        '''        
+        '''
         prj = cp.zeros([img.shape[0], det_center.shape[0], self.nv, self.nu], cp.float32)
 
         module.cupyDistanceDrivenTomoProjection.restype = c_int
         err = module.cupyDistanceDrivenTomoProjection(
-            c_void_p(prj.data.ptr), 
-            c_void_p(img.data.ptr), 
-            c_void_p(det_center.data.ptr), 
+            c_void_p(prj.data.ptr),
+            c_void_p(img.data.ptr),
+            c_void_p(det_center.data.ptr),
             c_void_p(src.data.ptr),
             c_ulong(img.shape[0]),
-            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
-            c_float(self.dx), c_float(self.dy), c_float(self.dz),
-            c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
-            c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
-        
+            c_ulong(img.shape[3]),
+            c_ulong(img.shape[2]),
+            c_ulong(img.shape[1]),
+            c_float(self.dx),
+            c_float(self.dy),
+            c_float(self.dz),
+            c_float(self.cx),
+            c_float(self.cy),
+            c_float(self.cz),
+            c_ulong(prj.shape[3]),
+            c_ulong(prj.shape[2]),
+            c_ulong(prj.shape[1]),
+            c_float(self.du),
+            c_float(self.dv),
+            c_float(self.off_u),
+            c_float(self.off_v)
+        )
+
         if err != 0:
-            print (err)
+            print(err)
 
         return prj
-    
+
     def distance_driven_bp_tomo(self, prj, det_center, src):
         '''
         Distance driven backprojection for tomosynthesis. It assumes that the detector has u=(1,0,0) and v = (0,1,0).
@@ -243,19 +305,31 @@ class ct_projector:
 
         module.cupyDistanceDrivenTomoBackprojection.restype = c_int
         err = module.cupyDistanceDrivenTomoBackprojection(
-            c_void_p(img.data.ptr), 
-            c_void_p(prj.data.ptr), 
-            c_void_p(det_center.data.ptr), 
+            c_void_p(img.data.ptr),
+            c_void_p(prj.data.ptr),
+            c_void_p(det_center.data.ptr),
             c_void_p(src.data.ptr),
             c_ulong(img.shape[0]),
-            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
-            c_float(self.dx), c_float(self.dy), c_float(self.dz),
-            c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
-            c_float(self.du), c_float(self.dv), c_float(self.off_u), c_float(self.off_v))
-        
+            c_ulong(img.shape[3]),
+            c_ulong(img.shape[2]),
+            c_ulong(img.shape[1]),
+            c_float(self.dx),
+            c_float(self.dy),
+            c_float(self.dz),
+            c_float(self.cx),
+            c_float(self.cy),
+            c_float(self.cz),
+            c_ulong(prj.shape[3]),
+            c_ulong(prj.shape[2]),
+            c_ulong(prj.shape[1]),
+            c_float(self.du),
+            c_float(self.dv),
+            c_float(self.off_u),
+            c_float(self.off_v)
+        )
+
         if err != 0:
-            print (err)
+            print(err)
 
         return img
 
@@ -274,23 +348,36 @@ class ct_projector:
         module.cupyDistanceDrivenFanProjection.restype = c_int
 
         err = module.cupyDistanceDrivenFanProjection(
-            c_void_p(prj.data.ptr), 
+            c_void_p(prj.data.ptr),
             c_void_p(img.data.ptr),
             c_void_p(angles.data.ptr),
-            c_ulong(img.shape[0]), 
-            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
-            c_float(self.dx), c_float(self.dy), c_float(self.dz),
-            c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
-            c_float(self.du / self.dsd), c_float(self.dv), c_float(self.off_u), c_float(self.off_v), 
-            c_float(self.dsd), c_float(self.dso))
-        
+            c_ulong(img.shape[0]),
+            c_ulong(img.shape[3]),
+            c_ulong(img.shape[2]),
+            c_ulong(img.shape[1]),
+            c_float(self.dx),
+            c_float(self.dy),
+            c_float(self.dz),
+            c_float(self.cx),
+            c_float(self.cy),
+            c_float(self.cz),
+            c_ulong(prj.shape[3]),
+            c_ulong(prj.shape[2]),
+            c_ulong(prj.shape[1]),
+            c_float(self.du / self.dsd),
+            c_float(self.dv),
+            c_float(self.off_u),
+            c_float(self.off_v),
+            c_float(self.dsd),
+            c_float(self.dso)
+        )
+
         if err != 0:
-            print (err)
-        
+            print(err)
+
         return prj
-    
-    def distance_driven_fan_bp(self, prj, angles, is_fbp = False):
+
+    def distance_driven_fan_bp(self, prj, angles, is_fbp=False):
         '''
         Fanbeam backprojection with circular equiangular detector. Distance driven
         @params:
@@ -303,7 +390,7 @@ class ct_projector:
         '''
 
         img = cp.zeros([prj.shape[0], self.nz, self.ny, self.nx], cp.float32)
-        if is_fbp: 
+        if is_fbp:
             type_projector = 1
         else:
             type_projector = 0
@@ -311,23 +398,37 @@ class ct_projector:
         module.cupyDistanceDrivenFanBackprojection.restype = c_int
 
         err = module.cupyDistanceDrivenFanBackprojection(
-            c_void_p(img.data.ptr), 
+            c_void_p(img.data.ptr),
             c_void_p(prj.data.ptr),
             c_void_p(angles.data.ptr),
-            c_ulong(img.shape[0]), 
-            c_ulong(img.shape[3]), c_ulong(img.shape[2]), c_ulong(img.shape[1]), 
-            c_float(self.dx), c_float(self.dy), c_float(self.dz),
-            c_float(self.cx), c_float(self.cy), c_float(self.cz),
-            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]),
-            c_float(self.du / self.dsd), c_float(self.dv), c_float(self.off_u), c_float(self.off_v), 
-            c_float(self.dsd), c_float(self.dso), c_int(type_projector))
-        
+            c_ulong(img.shape[0]),
+            c_ulong(img.shape[3]),
+            c_ulong(img.shape[2]),
+            c_ulong(img.shape[1]),
+            c_float(self.dx),
+            c_float(self.dy),
+            c_float(self.dz),
+            c_float(self.cx),
+            c_float(self.cy),
+            c_float(self.cz),
+            c_ulong(prj.shape[3]),
+            c_ulong(prj.shape[2]),
+            c_ulong(prj.shape[1]),
+            c_float(self.du / self.dsd),
+            c_float(self.dv),
+            c_float(self.off_u),
+            c_float(self.off_v),
+            c_float(self.dsd),
+            c_float(self.dso),
+            c_int(type_projector)
+        )
+
         if err != 0:
-            print (err)
-        
+            print(err)
+
         return img
-    
-    def filter_tomo(self, prj, det_center, src, filter_type = 'hann', cutoff_x = 1, cutoff_y = 1):
+
+    def filter_tomo(self, prj, det_center, src, filter_type='hann', cutoff_x=1, cutoff_y=1):
         if filter_type.lower() == 'hamming':
             ifilter = 1
         elif filter_type.lower() == 'hann':
@@ -339,16 +440,23 @@ class ct_projector:
 
         module.cupyFbpTomoFilter.restype = c_int
         err = module.cupyFbpTomoFilter(
-            c_void_p(fprj.data.ptr), 
-            c_void_p(prj.data.ptr), 
-            c_void_p(det_center.data.ptr), 
+            c_void_p(fprj.data.ptr),
+            c_void_p(prj.data.ptr),
+            c_void_p(det_center.data.ptr),
             c_void_p(src.data.ptr),
             c_ulong(prj.shape[0]),
-            c_ulong(prj.shape[3]), c_ulong(prj.shape[2]), c_ulong(prj.shape[1]), 
-            c_float(self.du), c_float(self.dx), c_float(self.dz),
-            c_int(ifilter), c_float(cutoff_x), c_float(cutoff_y))
-        
+            c_ulong(prj.shape[3]),
+            c_ulong(prj.shape[2]),
+            c_ulong(prj.shape[1]),
+            c_float(self.du),
+            c_float(self.dx),
+            c_float(self.dz),
+            c_int(ifilter),
+            c_float(cutoff_x),
+            c_float(cutoff_y)
+        )
+
         if err != 0:
-            print (err)
+            print(err)
 
         return fprj

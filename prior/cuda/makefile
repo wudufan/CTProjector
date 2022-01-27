@@ -10,6 +10,12 @@
 
 # $(shell mkdir -p $(OUT))
 
+GPU_CODE_FLAG= \
+-gencode=arch=compute_60,code=sm_60 \
+-gencode=arch=compute_61,code=sm_61 \
+-gencode=arch=compute_70,code=sm_70 \
+-gencode=arch=compute_75,code=sm_75
+
 OUT = ./output
 DST = ..
 TARGET = libprior
@@ -31,12 +37,12 @@ static: ${STATIC_TARGET}
 
 # shared library for python
 ${SHARED_TARGET}: ${OBJECTS}
-	nvcc --shared $(OBJECTS) -arch=sm_70 -o ${SHARED_TARGET}
+	nvcc --shared $(OBJECTS) ${GPU_CODE_FLAG} -o ${SHARED_TARGET}
 	cp ${SHARED_TARGET} ${DST}/${TARGET}.so
 
 # static library for tensorflow
 ${STATIC_TARGET}: $(OBJECTS)
-	nvcc -arch=sm_70 -dlink $(OBJECTS) --compiler-options '-fPIC' -o ${GPUCODE_TARGET}
+	nvcc ${GPU_CODE_FLAG} -dlink $(OBJECTS) --compiler-options '-fPIC' -o ${GPUCODE_TARGET}
 	ar rcs ${STATIC_TARGET} $(OBJECTS) ${GPUCODE_TARGET}
 
 # header dependency
@@ -45,7 +51,7 @@ ${STATIC_TARGET}: $(OBJECTS)
 # compile
 ${OUT}/%.o: %.cu
 	nvcc -E --compiler-options '-MM -MF $(patsubst %.o,%.d,$@) -MT $@ -MP' $<
-	nvcc -O3 -arch=sm_70 -I.. -dc --compiler-options '-fPIC' $< -o $@
+	nvcc -O3 ${GPU_CODE_FLAG} -I.. -dc --compiler-options '-fPIC' $< -o $@
 
 clean: 
 	-rm -f ${OBJECTS} ${STATIC_TARGET} ${SHARED_TARGET} ${GPUCODE_TARGET} ${DEPENDS}
