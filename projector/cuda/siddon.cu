@@ -81,9 +81,11 @@ __device__ SiddonTracingVars InitializeSiddon(float3 src, float3 dst, const Grid
 {
 	SiddonTracingVars var;
 
-	float dist = sqrtf((src.x - dst.x) * (src.x - dst.x) +
-			(src.y - dst.y) * (src.y - dst.y) +
-			(src.z - dst.z) * (src.z - dst.z));
+	float dist = sqrtf(
+		(src.x - dst.x) * (src.x - dst.x)
+		+ (src.y - dst.y) * (src.y - dst.y)
+		+ (src.z - dst.z) * (src.z - dst.z)
+	);
 
 	src = PhysicsToImg(src, grid);
 	dst = PhysicsToImg(dst, grid);
@@ -93,9 +95,9 @@ __device__ SiddonTracingVars InitializeSiddon(float3 src, float3 dst, const Grid
 	// intersection between ray and grid
 	float3 a0 = make_float3(1.0f, 1.0f, 1.0f);
 	float3 a1 = make_float3(0.0f, 0.0f, 0.0f);
-	if (!InboundAlpha(a0.x, a1.x, dDstSrc.x, src.x, grid.nx) ||
-		!InboundAlpha(a0.y, a1.y, dDstSrc.y, src.y, grid.ny) ||
-		!InboundAlpha(a0.z, a1.z, dDstSrc.z, src.z, grid.nz))
+	if (!InboundAlpha(a0.x, a1.x, dDstSrc.x, src.x, grid.nx)
+		|| !InboundAlpha(a0.y, a1.y, dDstSrc.y, src.y, grid.ny) 
+		|| !InboundAlpha(a0.z, a1.z, dDstSrc.z, src.z, grid.nz))
 	{
 		var.alpha.x = -1;
 		return var;
@@ -116,14 +118,18 @@ __device__ SiddonTracingVars InitializeSiddon(float3 src, float3 dst, const Grid
 	float3 pt0 = make_float3(src.x + amin * dDstSrc.x, src.y + amin * dDstSrc.y, src.z + amin * dDstSrc.z);
 
 	// first intersection voxel
-	int3 ng0 = make_int3(InboundFirstVoxel(pt0.x, dDstSrc.x, grid.nx),
+	int3 ng0 = make_int3(
+		InboundFirstVoxel(pt0.x, dDstSrc.x, grid.nx),
 		InboundFirstVoxel(pt0.y, dDstSrc.y, grid.ny),
-		InboundFirstVoxel(pt0.z, dDstSrc.z, grid.nz));
+		InboundFirstVoxel(pt0.z, dDstSrc.z, grid.nz)
+	);
 
 	// exiting point from first voxel
-	float3 pt1 = make_float3(OutboundFirstVoxel(ng0.x, dDstSrc.x),
-			OutboundFirstVoxel(ng0.y, dDstSrc.y),
-			OutboundFirstVoxel(ng0.z, dDstSrc.z));
+	float3 pt1 = make_float3(
+		OutboundFirstVoxel(ng0.x, dDstSrc.x),
+		OutboundFirstVoxel(ng0.y, dDstSrc.y),
+		OutboundFirstVoxel(ng0.z, dDstSrc.z)
+	);
 
 	// the alpha of the exiting point and step size along each direction
 	float3 alpha = make_float3(2.0f, 2.0f, 2.0f);	// the max value of alpha is 1, so if alpha is not set in any direction then it will be skipped
@@ -147,8 +153,8 @@ __device__ float SiddonRayTracing(float* pPrj, const float* pImg, float3 src, fl
 	SiddonTracingVars var = InitializeSiddon(src, dst, grid);
 
 	if (var.alpha.x < -0.5 || var.ng.x < 0 || var.ng.x >= grid.nx
-			|| var.ng.y < 0 || var.ng.y >= grid.ny
-			|| var.ng.z < 0 || var.ng.z >= grid.nz)
+		|| var.ng.y < 0 || var.ng.y >= grid.ny
+		|| var.ng.z < 0 || var.ng.z >= grid.nz)
 	{
 		// no intersections
 		return 0;

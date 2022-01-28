@@ -9,8 +9,14 @@
 
 using namespace std;
 
-__device__ __host__ static float3 GetDstForCone(float u, float v,
-		const float3& detCenter, const float3& detU, const float3& detV, const Grid grid)
+__device__ __host__ static float3 GetDstForCone(
+	float u,
+	float v,
+	const float3& detCenter,
+	const float3& detU,
+	const float3& detV,
+	const Grid grid
+)
 {
 	return make_float3(detCenter.x + detU.x * u + detV.x * v,
 		detCenter.y + detU.y * u + detV.y * v,
@@ -18,9 +24,17 @@ __device__ __host__ static float3 GetDstForCone(float u, float v,
 
 }
 
-__global__ void SiddonConeProjectionAbitraryKernel(float* pPrj, const float* pImg,
-	const float3* pDetCenter, const float3* pDetU, const float3* pDetV, const float3* pSrc,
-	int nview, const Detector det, const Grid grid)
+__global__ void SiddonConeProjectionArbitraryKernel(
+	float* pPrj,
+	const float* pImg,
+	const float3* pDetCenter,
+	const float3* pDetU,
+	const float3* pDetV,
+	const float3* pSrc,
+	int nview,
+	const Detector det,
+	const Grid grid
+)
 {
 	int iu = blockDim.x * blockIdx.x + threadIdx.x;
 	int iv = blockDim.y * blockIdx.y + threadIdx.y;
@@ -42,9 +56,17 @@ __global__ void SiddonConeProjectionAbitraryKernel(float* pPrj, const float* pIm
 
 }
 
-__global__ void SiddonConeBackprojectionAbitraryKernel(float* pImg, const float* pPrj,
-		const float3* pDetCenter, const float3* pDetU, const float3* pDetV, const float3* pSrc,
-		int nview, const Detector det, const Grid grid)
+__global__ void SiddonConeBackprojectionArbitraryKernel(
+	float* pImg,
+	const float* pPrj,
+	const float3* pDetCenter,
+	const float3* pDetU,
+	const float3* pDetV,
+	const float3* pSrc,
+	int nview,
+	const Detector det,
+	const Grid grid
+)
 {
 	int iu = blockDim.x * blockIdx.x + threadIdx.x;
 	int iv = blockDim.y * blockIdx.y + threadIdx.y;
@@ -66,60 +88,92 @@ __global__ void SiddonConeBackprojectionAbitraryKernel(float* pImg, const float*
 
 }
 
-void SiddonCone::ProjectionAbitrary(const float* pcuImg, float* pcuPrj, const float3* pcuDetCenter,
-		const float3* pcuDetU, const float3* pcuDetV, const float3* pcuSrc)
+void SiddonCone::ProjectionArbitrary(
+	const float* pcuImg,
+	float* pcuPrj,
+	const float3* pcuDetCenter,
+	const float3* pcuDetU,
+	const float3* pcuDetV,
+	const float3* pcuSrc
+)
 {
 	dim3 threads, blocks;
 	GetThreadsForXY(threads, blocks, nu, nv, nview);
 
 	for (int ib = 0; ib < nBatches; ib++)
 	{
-		SiddonConeProjectionAbitraryKernel<<<blocks, threads, 0, m_stream>>>(
-				pcuPrj + ib * nu * nv * nview,
-				pcuImg + ib * nx * ny * nz,
-				pcuDetCenter, 
-				pcuDetU,
-				pcuDetV, 
-				pcuSrc,
-				nview,
-				MakeDetector(nu, nv, du, dv, off_u, off_v),
-				MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz)
-				);
+		SiddonConeProjectionArbitraryKernel<<<blocks, threads, 0, m_stream>>>(
+			pcuPrj + ib * nu * nv * nview,
+			pcuImg + ib * nx * ny * nz,
+			pcuDetCenter, 
+			pcuDetU,
+			pcuDetV, 
+			pcuSrc,
+			nview,
+			MakeDetector(nu, nv, du, dv, off_u, off_v),
+			MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz)
+		);
 
 		cudaStreamSynchronize(m_stream);
 	}
 
 }
 
-void SiddonCone::BackprojectionAbitrary(float* pcuImg, const float* pcuPrj, const float3* pcuDetCenter,
-			const float3* pcuDetU, const float3* pcuDetV, const float3* pcuSrc)
+void SiddonCone::BackprojectionArbitrary(
+	float* pcuImg,
+	const float* pcuPrj,
+	const float3* pcuDetCenter,
+	const float3* pcuDetU,
+	const float3* pcuDetV,
+	const float3* pcuSrc
+)
 {
 	dim3 threads, blocks;
 	GetThreadsForXY(threads, blocks, nu, nv, nview);
 
 	for (int ib = 0; ib < nBatches; ib++)
 	{
-		SiddonConeBackprojectionAbitraryKernel<<<blocks, threads, 0, m_stream>>>(
-				pcuImg + ib * nx * ny * nz,
-				pcuPrj + ib * nu * nv * nview,
-				pcuDetCenter, 
-				pcuDetU,
-				pcuDetV, 
-				pcuSrc,
-				nview, 
-				MakeDetector(nu, nv, du, dv, off_u, off_v),
-				MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz)
-				);
+		SiddonConeBackprojectionArbitraryKernel<<<blocks, threads, 0, m_stream>>>(
+			pcuImg + ib * nx * ny * nz,
+			pcuPrj + ib * nu * nv * nview,
+			pcuDetCenter, 
+			pcuDetU,
+			pcuDetV, 
+			pcuSrc,
+			nview, 
+			MakeDetector(nu, nv, du, dv, off_u, off_v),
+			MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz)
+		);
 
 		cudaStreamSynchronize(m_stream);
 	}
 }
 
-extern "C" int cSiddonConeProjectionAbitrary(float* prj, const float* img,
-		const float* detCenter, const float* detU, const float* detV, const float* src,
-		size_t nBatches, 
-		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
+extern "C" int cSiddonConeProjectionArbitrary(
+	float* prj,
+	const float* img,
+	const float* detCenter,
+	const float* detU,
+	const float* detV,
+	const float* src,
+	size_t nBatches, 
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v
+)
 {
 	float* pcuPrj = NULL;
 	float* pcuImg = NULL;
@@ -163,17 +217,19 @@ extern "C" int cSiddonConeProjectionAbitrary(float* prj, const float* img,
 		cudaMemset(pcuPrj, 0, sizeof(float) * nu * nview * nv * nBatches);
 
 		SiddonCone projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0
+		);
 
-		projector.ProjectionAbitrary(pcuImg, pcuPrj, pcuDetCenter, pcuDetU, pcuDetV, pcuSrc);
+		projector.ProjectionArbitrary(pcuImg, pcuPrj, pcuDetCenter, pcuDetU, pcuDetV, pcuSrc);
 		cudaMemcpy(prj, pcuPrj, sizeof(float) * nu * nv * nview * nBatches, cudaMemcpyDeviceToHost);
 	}
 	catch (exception& e)
 	{
 		ostringstream oss;
-		oss << "cSiddonConeProjectionAbitrary() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "cSiddonConeProjectionArbitrary() failed: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 
 	}
@@ -189,25 +245,47 @@ extern "C" int cSiddonConeProjectionAbitrary(float* prj, const float* img,
 
 }
 
-extern "C" int cupySiddonConeProjectionAbitrary(float* prj, const float* img,
-	const float* detCenter, const float* detU, const float* detV, const float* src,
-	size_t nBatches, 
-	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
+extern "C" int cupySiddonConeProjectionArbitrary(
+	float* prj,
+	const float* img,
+	const float* detCenter,
+	const float* detU,
+	const float* detV,
+	const float* src,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v
+)
 {
 	try
 	{
 		SiddonCone projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0
+		);
 
-		projector.ProjectionAbitrary(img, prj, (const float3*)detCenter, (const float3*)detU, (const float3*)detV, (const float3*)src);
+		projector.ProjectionArbitrary(img, prj, (const float3*)detCenter, (const float3*)detU, (const float3*)detV, (const float3*)src);
 	}
 	catch (exception& e)
 	{
 		ostringstream oss;
-		oss << "cSiddonConeProjectionAbitrary() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "cSiddonConeProjectionArbitrary() failed: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 
 	}
@@ -216,11 +294,31 @@ extern "C" int cupySiddonConeProjectionAbitrary(float* prj, const float* img,
 
 }
 
-extern "C" int cSiddonConeBackprojectionAbitrary(float* img, const float* prj,
-		const float* detCenter, const float* detU, const float* detV, const float* src,
-		size_t nBatches,
-		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
+extern "C" int cSiddonConeBackprojectionArbitrary(
+	float* img,
+	const float* prj,
+	const float* detCenter,
+	const float* detU,
+	const float* detV,
+	const float* src,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v
+)
 {
 	float* pcuPrj = NULL;
 	float* pcuImg = NULL;
@@ -264,21 +362,22 @@ extern "C" int cSiddonConeBackprojectionAbitrary(float* img, const float* prj,
 		cudaMemset(pcuImg, 0, sizeof(float) * nx * ny * nz * nBatches);
 
 		SiddonCone projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0
+		);
 
-		projector.BackprojectionAbitrary(pcuImg, pcuPrj, pcuDetCenter, pcuDetU, pcuDetV, pcuSrc);
+		projector.BackprojectionArbitrary(pcuImg, pcuPrj, pcuDetCenter, pcuDetU, pcuDetV, pcuSrc);
 
 		cudaMemcpy(img, pcuImg, sizeof(float) * nx * ny * nz * nBatches, cudaMemcpyDeviceToHost);
 	}
 	catch (exception& e)
 	{
 		ostringstream oss;
-		oss << "cSiddonConeBackprojectionAbitrary() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "cSiddonConeBackprojectionArbitrary() failed: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
-
 
 	if (pcuPrj != NULL) cudaFree(pcuPrj);
 	if (pcuImg != NULL) cudaFree(pcuImg);
@@ -291,29 +390,50 @@ extern "C" int cSiddonConeBackprojectionAbitrary(float* img, const float* prj,
 
 }
 
-extern "C" int cupySiddonConeBackprojectionAbitrary(float* img, const float* prj,
-	const float* detCenter, const float* detU, const float* detV, const float* src,
+extern "C" int cupySiddonConeBackprojectionArbitrary(
+	float* img,
+	const float* prj,
+	const float* detCenter,
+	const float* detU,
+	const float* detV,
+	const float* src,
 	size_t nBatches,
-	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v
+)
 {
 	try
 	{
 		SiddonCone projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0
+		);
 
-		projector.BackprojectionAbitrary(img, prj, (const float3*)detCenter, (const float3*)detU, (const float3*)detV, (const float3*)src);
+		projector.BackprojectionArbitrary(img, prj, (const float3*)detCenter, (const float3*)detU, (const float3*)detV, (const float3*)src);
 	}
 	catch (exception& e)
 	{
 		ostringstream oss;
-		oss << "cSiddonConeBackprojectionAbitrary() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "cSiddonConeBackprojectionArbitrary() failed: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 
 	return cudaGetLastError();
 
 }
-

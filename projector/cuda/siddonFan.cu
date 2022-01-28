@@ -9,9 +9,16 @@
 
 using namespace std;
 
-__global__ void SiddonFanProjectionKernel(float* pPrj, const float* pImg,
-	const float* pDeg, size_t nview, const Grid grid, const Detector det,
-	float dsd, float dso)
+__global__ void SiddonFanProjectionKernel(
+    float* pPrj,
+    const float* pImg,
+	const float* pDeg,
+    size_t nview,
+    const Grid grid,
+    const Detector det,
+	float dsd,
+    float dso
+)
 {
 	int iu = blockDim.x * blockIdx.x + threadIdx.x;
 	int iv = blockDim.y * blockIdx.y + threadIdx.y;
@@ -38,9 +45,16 @@ __global__ void SiddonFanProjectionKernel(float* pPrj, const float* pImg,
 
 }
 
-__global__ void SiddonFanBackprojectionKernel(float* pImg, const float* pPrj,
-	const float* pDeg, size_t nview, const Grid grid, const Detector det,
-	float dsd, float dso)
+__global__ void SiddonFanBackprojectionKernel(
+    float* pImg,
+    const float* pPrj,
+	const float* pDeg,
+    size_t nview,
+    const Grid grid,
+    const Detector det,
+	float dsd,
+    float dso
+)
 {
 	int iu = blockDim.x * blockIdx.x + threadIdx.x;
 	int iv = blockDim.y * blockIdx.y + threadIdx.y;
@@ -75,12 +89,15 @@ void SiddonFan::Projection(const float* pcuImg, float* pcuPrj, const float* pcuD
 	for (int ib = 0; ib < nBatches; ib++)
 	{
         SiddonFanProjectionKernel<<<blocks, threads, 0, m_stream>>>(
-                pcuPrj + ib * nu * nv * nview, 
-                pcuImg + ib * nx * ny * nz, 
-                pcuDeg, nview,
-                MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz),
-                MakeDetector(nu, nv, du, dv, off_u, off_v), 
-                dsd, dso);
+            pcuPrj + ib * nu * nv * nview, 
+            pcuImg + ib * nx * ny * nz, 
+            pcuDeg,
+            nview,
+            MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz),
+            MakeDetector(nu, nv, du, dv, off_u, off_v), 
+            dsd,
+            dso
+        );
         cudaDeviceSynchronize();
 	}
 
@@ -94,21 +111,44 @@ void SiddonFan::Backprojection(float* pcuImg, const float* pcuPrj, const float* 
 	for (int ib = 0; ib < nBatches; ib++)
 	{
         SiddonFanBackprojectionKernel<<<blocks, threads, 0, m_stream>>>(
-                pcuImg + ib * nx * ny * nz,
-                pcuPrj + ib * nu * nview * nv, 
-                pcuDeg, nview,
-                MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz),
-                MakeDetector(nu, nv, du, dv, off_u, off_v), 
-                dsd, dso);
+            pcuImg + ib * nx * ny * nz,
+            pcuPrj + ib * nu * nview * nv, 
+            pcuDeg,
+            nview,
+            MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz),
+            MakeDetector(nu, nv, du, dv, off_u, off_v), 
+            dsd,
+            dso
+        );
         cudaDeviceSynchronize();
 	}
 
 }
 
-extern "C" int cSiddonFanProjection(float* prj, const float* img, const float* deg,
-    int nBatches, size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-    size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
-    float dsd, float dso)
+extern "C" int cSiddonFanProjection(
+    float* prj,
+    const float* img,
+    const float* deg,
+    int nBatches,
+    size_t nx,
+    size_t ny,
+    size_t nz,
+    float dx,
+    float dy,
+    float dz,
+    float cx,
+    float cy,
+    float cz,
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float da,
+    float dv,
+    float off_a,
+    float off_v,
+    float dsd,
+    float dso
+)
 {
     float* pcuImg = NULL;
     float* pcuPrj = NULL;
@@ -135,8 +175,10 @@ extern "C" int cSiddonFanProjection(float* prj, const float* img, const float* d
         cudaMemset(pcuPrj, 0, sizeof(float) * nBatches * nu * nv * nview);
 
         SiddonFan projector;
-        projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-                nu, nv, nview, da, dv, off_a, off_v, dsd, dso);
+        projector.Setup(
+            nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+            nu, nv, nview, da, dv, off_a, off_v, dsd, dso
+        );
 
         projector.Projection(pcuImg, pcuPrj, pcuDeg);
         cudaMemcpy(prj, pcuPrj, sizeof(float) * nBatches * nu * nview * nv, cudaMemcpyDeviceToHost);
@@ -145,7 +187,7 @@ extern "C" int cSiddonFanProjection(float* prj, const float* img, const float* d
     {
         ostringstream oss;
         oss << "cSiddonFanProjection failed: " << e.what()
-                << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
         cerr << oss.str() << endl;
     }
 
@@ -157,10 +199,30 @@ extern "C" int cSiddonFanProjection(float* prj, const float* img, const float* d
 
 }
 
-extern "C" int cSiddonFanBackprojection(float* img, const float* prj, const float* deg,
-    int nBatches, size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-    size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
-    float dsd, float dso)
+extern "C" int cSiddonFanBackprojection(
+    float* img,
+    const float* prj,
+    const float* deg,
+    int nBatches,
+    size_t nx,
+    size_t ny,
+    size_t nz,
+    float dx,
+    float dy,
+    float dz,
+    float cx,
+    float cy,
+    float cz,
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float da,
+    float dv,
+    float off_a,
+    float off_v,
+    float dsd,
+    float dso
+)
 {
     float* pcuImg = NULL;
     float* pcuPrj = NULL;
@@ -187,8 +249,10 @@ extern "C" int cSiddonFanBackprojection(float* img, const float* prj, const floa
         cudaMemset(pcuImg, 0, sizeof(float) * nBatches * nx * ny * nz);
 
         SiddonFan projector;
-        projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-                nu, nv, nview, da, dv, off_a, off_v, dsd, dso);
+        projector.Setup(
+            nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+            nu, nv, nview, da, dv, off_a, off_v, dsd, dso
+        );
 
         projector.Backprojection(pcuImg, pcuPrj, pcuDeg);
         cudaMemcpy(img, pcuImg, sizeof(float) * nBatches * nx * ny * nz, cudaMemcpyDeviceToHost);
@@ -198,7 +262,7 @@ extern "C" int cSiddonFanBackprojection(float* img, const float* prj, const floa
     {
         ostringstream oss;
         oss << "cSiddonFanBackprojection failed: " << e.what()
-                << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
         cerr << oss.str() << endl;
     }
 

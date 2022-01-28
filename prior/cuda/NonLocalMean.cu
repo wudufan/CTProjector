@@ -29,9 +29,22 @@ ix1,iy1,iz1 - point2 in the guide image;
 nx,ny,nz - size of the guide image;
 nkx, nky, nkz - size of the guassian kernel
 */
-__device__ float GaussianDistance2(const float* guide, const float* gaussian,
-        int ix0, int iy0, int iz0, int ix1, int iy1, int iz1, 
-        size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+__device__ float GaussianDistance2(
+	const float* guide,
+	const float* gaussian,
+    int ix0,
+	int iy0,
+	int iz0,
+	int ix1,
+	int iy1,
+	int iz1,
+    size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
 	float dist = 0;
 	for (int ikx = 0; ikx < nkx; ikx++)
@@ -74,8 +87,23 @@ nsx, nsy, nsz - the local search window to perform local linear fitting
 nx, ny, nz - the size of the image
 nkx, nky, nkz - the size of the gaussian kernel
 */
-__global__ void hyprNlmKernel(float* res, const float* img, const float* guide, const float* gaussian,
-    float d2, float eps, int nsx, int nsy, int nsz, size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+__global__ void hyprNlmKernel(
+	float* res,
+	const float* img,
+	const float* guide,
+	const float* gaussian,
+    float d2,
+	float eps,
+	int nsx,
+	int nsy,
+	int nsz,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
 	int ix = blockIdx.x * blockDim.x + threadIdx.x;
 	int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -117,8 +145,23 @@ __global__ void hyprNlmKernel(float* res, const float* img, const float* guide, 
 The non-local mean kernel.
 It use the guide image to calculate the weighting factors then average the image within the earch window. 
 */
-__global__ void nlmKernel(float* res, const float* img, const float* guide, const float* gaussian,
-    float d2, float eps, int nsx, int nsy, int nsz, size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+__global__ void nlmKernel(
+	float* res,
+	const float* img,
+	const float* guide,
+	const float* gaussian,
+    float d2,
+	float eps,
+	int nsx,
+	int nsy,
+	int nsz,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
 	int ix = blockIdx.x * blockDim.x + threadIdx.x;
 	int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -161,38 +204,116 @@ extern "C" int cSetDevice(int i)
 	return cudaSetDevice(i);
 }
 
-void hyprNlm(float* res, const float* img, const float* guide, const float* gaussian,
-    float d2, float eps, int nsx, int nsy, int nsz, size_t nBatches, size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+void hyprNlm(
+	float* res,
+	const float* img,
+	const float* guide,
+	const float* gaussian,
+    float d2,
+	float eps,
+	int nsx,
+	int nsy,
+	int nsz,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
     dim3 threads(32, 16, 1);
     dim3 blocks((int)ceilf(nx / (float)threads.x), (int)ceilf(ny / (float)threads.y), (int)ceilf(nz / (float)threads.z));
     for (int ib = 0; ib < nBatches; ib++)
     {
         int offset = ib * nx * ny * nz;
-        hyprNlmKernel<<<blocks, threads>>>(res + offset, img + offset, guide + offset, 
-            gaussian, d2, eps, nsx, nsy, nsz, nx, ny, nz, nkx, nky, nkz);
+        hyprNlmKernel<<<blocks, threads>>>(
+			res + offset,
+			img + offset,
+			guide + offset, 
+            gaussian,
+			d2,
+			eps,
+			nsx,
+			nsy,
+			nsz,
+			nx,
+			ny,
+			nz,
+			nkx,
+			nky,
+			nkz
+		);
     }
     cudaDeviceSynchronize();
 
 }
 
-void nlm(float* res, const float* img, const float* guide, const float* gaussian,
-    float d2, float eps, int nsx, int nsy, int nsz, size_t nBatches, size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+void nlm(
+	float* res,
+	const float* img,
+	const float* guide,
+	const float* gaussian,
+    float d2,
+	float eps,
+	int nsx,
+	int nsy,
+	int nsz,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
     dim3 threads(32, 16, 1);
     dim3 blocks((int)ceilf(nx / (float)threads.x), (int)ceilf(ny / (float)threads.y), (int)ceilf(nz / (float)threads.z));
     for (int ib = 0; ib < nBatches; ib++)
     {
         int offset = ib * nx * ny * nz;
-        nlmKernel<<<blocks, threads>>>(res + offset, img + offset, guide + offset, 
-            gaussian, d2, eps, nsx, nsy, nsz, nx, ny, nz, nkx, nky, nkz);
+        nlmKernel<<<blocks, threads>>>(
+			res + offset,
+			img + offset,
+			guide + offset, 
+            gaussian,
+			d2,
+			eps,
+			nsx,
+			nsy,
+			nsz,
+			nx,
+			ny,
+			nz,
+			nkx,
+			nky,
+			nkz
+		);
     }
     cudaDeviceSynchronize();
 
 }
 
-extern "C" int cHyprNlm(float* res, const float* img, const float* guide, const float* gaussian,
-    float d2, float eps, int nsx, int nsy, int nsz, size_t nBatches, size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+extern "C" int cHyprNlm(
+	float* res,
+	const float* img,
+	const float* guide,
+	const float* gaussian,
+    float d2,
+	float eps,
+	int nsx,
+	int nsy,
+	int nsz,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
 	float* cuRes = NULL;
 	float* cuGaussian = NULL;
@@ -254,8 +375,24 @@ extern "C" int cHyprNlm(float* res, const float* img, const float* guide, const 
 
 }
 
-extern "C" int cNlm(float* res, const float* img, const float* guide, const float* gaussian,
-    float d2, float eps, int nsx, int nsy, int nsz, size_t nBatches, size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+extern "C" int cNlm(
+	float* res,
+	const float* img,
+	const float* guide,
+	const float* gaussian,
+    float d2,
+	float eps,
+	int nsx,
+	int nsy,
+	int nsz,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
 	float* cuRes = NULL;
 	float* cuGaussian = NULL;
@@ -317,8 +454,24 @@ extern "C" int cNlm(float* res, const float* img, const float* guide, const floa
 
 }
 
-extern "C" int cupyHyprNlm(float* res, const float* img, const float* guide, const float* gaussian,
-    float d2, float eps, int nsx, int nsy, int nsz, size_t nBatches, size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+extern "C" int cupyHyprNlm(
+	float* res,
+	const float* img,
+	const float* guide,
+	const float* gaussian,
+    float d2,
+	float eps,
+	int nsx,
+	int nsy,
+	int nsz,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
 	try
 	{
@@ -335,8 +488,24 @@ extern "C" int cupyHyprNlm(float* res, const float* img, const float* guide, con
 
 }
 
-extern "C" int cupyNlm(float* res, const float* img, const float* guide, const float* gaussian,
-    float d2, float eps, int nsx, int nsy, int nsz, size_t nBatches, size_t nx, size_t ny, size_t nz, int nkx, int nky, int nkz)
+extern "C" int cupyNlm(
+	float* res,
+	const float* img,
+	const float* guide,
+	const float* gaussian,
+    float d2,
+	float eps,
+	int nsx,
+	int nsy,
+	int nsz,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	int nkx,
+	int nky,
+	int nkz
+)
 {
 	try
 	{

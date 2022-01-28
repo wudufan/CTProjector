@@ -1,27 +1,50 @@
+'''
+Cupy wrapper of the denoisers.
+'''
+
 import numpy as np
 import cupy as cp
 from ctypes import cdll, c_int, c_void_p, c_float, c_ulong
+from typing import Tuple
 import os
 from scipy.ndimage.filters import gaussian_filter
 
 module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprior.so'))
 
 
-def nlm(img, guide, d, search_size, kernel_size, kernel_std, eps=1e-6):
+def nlm(
+    img: cp.array,
+    guide: cp.array,
+    d: float,
+    search_size: Tuple[int, int, int],
+    kernel_size: Tuple[int, int, int],
+    kernel_std: float,
+    eps: float = 1e-6
+) -> cp.array:
     '''
     Non local mean denoising with guide.
 
-    @params:
-    @img - the image to be denoised
-    @guide - the guide image for nlm.
-    @d - larger the d, the weaker the guide. d should be estimated based on the noise level of guide.
-    @search_size - the search window size for averaging
-    @kernel_size - the gaussian kernel size to calculate distance between two points.
-    @kernel_std - std of the gaussian kernel
-    @eps - regularization
+    Parameters
+    -----------------
+    img: cp.array(float32) of shape [batch, nz, ny, nx].
+        The image to be denoised.
+    guide: cp.array(float32) of shape [batch, nz, ny, nx].
+        The guide image for NLM.
+    d: float.
+        The larger the d, the weaker the guide. d should be estimated based on the noise level of guide.
+    search_size: tuple of length 3.
+        The search window size for averaging.
+    kernel_size: tuple of length 3.
+        the gaussian kernel size to calculate distance between two points.
+    kernel_std: float.
+        Std of the gaussian kernel
+    eps: float.
+        Regularization factor.
 
-    @return:
-    res - the denoised image
+    Returns
+    -------------------
+    res: cp.array(float) of shape [batch, nz, ny, nx].
+        The denoised image.
     '''
     kernel = np.zeros(kernel_size, np.float32)
     kernel[int(kernel_size[0] / 2), int(kernel_size[1] / 2), int(kernel_size[2] / 2)] = 1

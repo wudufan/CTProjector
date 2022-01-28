@@ -15,13 +15,25 @@ void DistanceDrivenFan::Allocate(bool forward, bool backward)
 
 	if (forward)
 	{
-		if (cudaSuccess != cudaMalloc(&pAccX, sizeof(float) * (nx+1) * ny * nz)) throw runtime_error("pAccX allocation failed");
-		if (cudaSuccess != cudaMalloc(&pAccY, sizeof(float) * nx * (ny + 1) * nz)) throw runtime_error("pAccY allocation failed");
+		if (cudaSuccess != cudaMalloc(&pAccX, sizeof(float) * (nx + 1) * ny * nz))
+		{
+			throw runtime_error("pAccX allocation failed");
+		}
+		if (cudaSuccess != cudaMalloc(&pAccY, sizeof(float) * nx * (ny + 1) * nz))
+		{
+			throw runtime_error("pAccY allocation failed");
+		}
 	}
 	if (backward)
 	{
-		if (cudaSuccess != cudaMalloc(&pWeightedPrjs, sizeof(float) * nu * nv * nview)) throw runtime_error("pWeightedPrjs allocation failed");
-		if (cudaSuccess != cudaMalloc(&pAccU, sizeof(float) * (nu + 1) * nv * nview)) throw runtime_error("pAccU allocation failed");
+		if (cudaSuccess != cudaMalloc(&pWeightedPrjs, sizeof(float) * nu * nv * nview))
+		{
+			throw runtime_error("pWeightedPrjs allocation failed");
+		}
+		if (cudaSuccess != cudaMalloc(&pAccU, sizeof(float) * (nu + 1) * nv * nview))
+		{
+			throw runtime_error("pAccU allocation failed");
+		}
 	}
 	
 }
@@ -91,8 +103,17 @@ dsd - distance between source and detector
 dso - distance between source and iso-center
 
 */
-__global__ void DDFPFanKernel(float* pPrjs, const float* pAccX, const float* pAccY, const float* pDeg,
-	size_t nview, const Grid grid, const Detector det, float dsd, float dso)
+__global__ void DDFPFanKernel(
+	float* pPrjs,
+	const float* pAccX,
+	const float* pAccY,
+	const float* pDeg,
+	size_t nview,
+	const Grid grid,
+	const Detector det,
+	float dsd,
+	float dso
+)
 {
 	int iu = blockDim.x * blockIdx.x + threadIdx.x;
 	int iv = blockDim.y * blockIdx.y + threadIdx.y;
@@ -159,8 +180,10 @@ __global__ void DDFPFanKernel(float* pPrjs, const float* pAccX, const float* pAc
 
 			The final distance driven is the average, so it should be nomalized by length (x2-x1)
 			*/
-			val += (InterpolateXZ(pAccX, x2, iy, z, grid.nx + 1, grid.ny, grid.nz) - 
-					InterpolateXZ(pAccX, x1, iy, z, grid.nx + 1, grid.ny, grid.nz)) / (x2 - x1);
+			val += (
+				InterpolateXZ(pAccX, x2, iy, z, grid.nx + 1, grid.ny, grid.nz) 
+				- InterpolateXZ(pAccX, x1, iy, z, grid.nx + 1, grid.ny, grid.nz)
+			) / (x2 - x1);
 				
 		}
 
@@ -178,8 +201,10 @@ __global__ void DDFPFanKernel(float* pPrjs, const float* pAccX, const float* pAc
 			float y2 = src.y + r2 * (ix - src.x);
 
 			// Please see DDFPFanKernelX for detailed explanation
-			val += (InterpolateYZ(pAccY, ix, y2, z, grid.nx, grid.ny + 1, grid.nz) - 
-					InterpolateYZ(pAccY, ix, y1, z, grid.nx, grid.ny + 1, grid.nz)) / (y2 - y1);
+			val += (
+				InterpolateYZ(pAccY, ix, y2, z, grid.nx, grid.ny + 1, grid.nz)
+				- InterpolateYZ(pAccY, ix, y1, z, grid.nx, grid.ny + 1, grid.nz)
+			) / (y2 - y1);
 		}
 
 		// normalize by length
@@ -212,30 +237,54 @@ void DistanceDrivenFan::Projection(const float* pcuImg, float* pcuPrj, const flo
 			// step 2: interpolation
 			dim3 threadDet, blockDet;
 			GetThreadsForXZ(threadDet, blockDet, nu, nv, nview);
-			DDFPFanKernel<<<blockDet, threadDet, 0, m_stream>>>(pcuPrj + ib * nu * nv * nview, pAccX, pAccY, pcuDeg, nview, grid, det, dsd, dso);
+			DDFPFanKernel<<<blockDet, threadDet, 0, m_stream>>>(
+				pcuPrj + ib * nu * nv * nview, pAccX, pAccY, pcuDeg, nview, grid, det, dsd, dso
+			);
 			cudaStreamSynchronize(m_stream);
 		}
 	}
 	catch (exception &e)
 	{
 		ostringstream oss;
-		oss << "DistanceDrivenFan::Projection Error: " << e.what() << " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "DistanceDrivenFan::Projection Error: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 		throw oss.str().c_str();
 	}
 }
 
-extern "C" int cupyDistanceDrivenFanProjection(float* prj, const float* img, const float* deg,
-	size_t nBatches, 
-	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
-	float dsd, float dso)
+extern "C" int cupyDistanceDrivenFanProjection(
+	float* prj,
+	const float* img,
+	const float* deg,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float da,
+	float dv,
+	float off_a,
+	float off_v,
+	float dsd,
+	float dso
+)
 {
 	try
 	{
 		DistanceDrivenFan projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, da, dv, off_a, off_v, dsd, dso);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, da, dv, off_a, off_v, dsd, dso
+		);
 		
 		projector.Allocate(true, false);
 		projector.Projection(img, prj, deg);
@@ -244,18 +293,38 @@ extern "C" int cupyDistanceDrivenFanProjection(float* prj, const float* img, con
 	catch (exception& e)
 	{
 		ostringstream oss;
-		oss << "cupyDistanceDrivenFanProjection() failed: " << e.what() << " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "cupyDistanceDrivenFanProjection() failed: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 
 	return cudaGetLastError();
 }
 
-extern "C" int cDistanceDrivenFanProjection(float* prj, const float* img, const float* deg,
-	size_t nBatches, 
-	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
-	float dsd, float dso)
+extern "C" int cDistanceDrivenFanProjection(
+	float* prj,
+	const float* img,
+	const float* deg,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float da,
+	float dv,
+	float off_a,
+	float off_v,
+	float dsd,
+	float dso
+)
 {
 	float* pcuImg = NULL;
 	float* pcuPrj = NULL;
@@ -282,8 +351,10 @@ extern "C" int cDistanceDrivenFanProjection(float* prj, const float* img, const 
 		cudaMemset(pcuPrj, 0, sizeof(float) * nBatches * nu * nv * nview);
 
 		DistanceDrivenFan projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, da, dv, off_a, off_v, dsd, dso);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, da, dv, off_a, off_v, dsd, dso
+		);
 		
 		projector.Allocate(true, false);
 		projector.Projection(pcuImg, pcuPrj, pcuDeg);
@@ -295,7 +366,7 @@ extern "C" int cDistanceDrivenFanProjection(float* prj, const float* img, const 
 	{
 		ostringstream oss;
 		oss << "cDistanceDrivenFanProjection failed: " << e.what()
-				<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+			<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 
@@ -338,8 +409,15 @@ __global__ void PreweightBPKernel(float* pPrjs, const float* pDeg, size_t nview,
 		
 }
 
-__global__ void PreweightBPKernelX(float* pPrjs, const float* pDeg, int* iviews, size_t nValidViews,
-	size_t nview, const Detector det, float dy)
+__global__ void PreweightBPKernelX(
+	float* pPrjs,
+	const float* pDeg,
+	int* iviews,
+	size_t nValidViews,
+	size_t nview,
+	const Detector det,
+	float dy
+)
 {
 	int iu = blockIdx.x * blockDim.x + threadIdx.x;
 	int iv = blockIdx.y * blockDim.y + threadIdx.y;
@@ -361,8 +439,15 @@ __global__ void PreweightBPKernelX(float* pPrjs, const float* pDeg, int* iviews,
 preweighting for backpojection where the main axis is X, i.e. integrated along y.
 It will weight the projections by the esitimated ray length, i.e. dx / sin(angle)
 */
-__global__ void PreweightBPKernelY(float* pPrjs, const float* pDeg, int* iviews, size_t nValidViews,
-	size_t nview, const Detector det, float dx)
+__global__ void PreweightBPKernelY(
+	float* pPrjs,
+	const float* pDeg,
+	int* iviews,
+	size_t nValidViews,
+	size_t nview,
+	const Detector det,
+	float dx
+)
 {
 	int iu = blockIdx.x * blockDim.x + threadIdx.x;
 	int iv = blockIdx.y * blockDim.y + threadIdx.y;
@@ -411,9 +496,17 @@ dso - distance between source and iso-center
 isFBP - if use FBP weighting for backprojection
 
 */
-__global__ void DDBPFanKernel(float* pImg, float* pAcc, const float* pDeg,
-	size_t nview, const Grid grid, const Detector det,
-	float dsd, float dso, bool isFBP)
+__global__ void DDBPFanKernel(
+	float* pImg,
+	float* pAcc,
+	const float* pDeg,
+	size_t nview,
+	const Grid grid,
+	const Detector det,
+	float dsd,
+	float dso,
+	bool isFBP
+)
 {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
 	int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -463,8 +556,10 @@ __global__ void DDBPFanKernel(float* pImg, float* pAcc, const float* pDeg,
 			a2 = t;
 		}
 
-		float val = (InterpolateXY(pAcc, a2, iv, iview, det.nu + 1, det.nv, nview) - 
-					 InterpolateXY(pAcc, a1, iv, iview, det.nu + 1, det.nv, nview)) / (a2 - a1);
+		float val = (
+			InterpolateXY(pAcc, a2, iv, iview, det.nu + 1, det.nv, nview)
+			- InterpolateXY(pAcc, a1, iv, iview, det.nu + 1, det.nv, nview)
+		) / (a2 - a1);
 
 		if (isFBP)
 		{
@@ -518,23 +613,46 @@ void DistanceDrivenFan::Backprojection(float* pcuImg, const float* pcuPrj, const
 	catch (exception &e)
 	{
 		ostringstream oss;
-		oss << "DistanceDrivenFan::Backprojection error: " << e.what() << " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "DistanceDrivenFan::Backprojection error: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 		throw oss.str().c_str();
 	}
 
 }
 
-extern "C" int cupyDistanceDrivenFanBackprojection(float* img, const float* prj, const float* deg,
+extern "C" int cupyDistanceDrivenFanBackprojection(
+	float* img,
+	const float* prj,
+	const float* deg,
 	size_t nBatches, 
-	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
-	float dsd, float dso, int typeProjector)
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float da,
+	float dv,
+	float off_a,
+	float off_v,
+	float dsd,
+	float dso,
+	int typeProjector
+)
 {
 	try
 	{
 		DistanceDrivenFan projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz, nu, nv, nview, da, dv, off_a, off_v, dsd, dso, typeProjector);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz, nu, nv, nview, da, dv, off_a, off_v, dsd, dso, typeProjector
+		);
 		
 		projector.Allocate(false, true);
 		projector.Backprojection(img, prj, deg);		
@@ -544,7 +662,7 @@ extern "C" int cupyDistanceDrivenFanBackprojection(float* img, const float* prj,
 	{
 		ostringstream oss;
 		oss << "cDistanceDrivenFanBackprojection failed: " << e.what()
-				<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+			<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 

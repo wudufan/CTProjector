@@ -11,12 +11,35 @@
 
 using namespace std;
 
-void fbpTomo::Setup(int nBatches, 
-    size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-    size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v,
-    float dsd, float dso, int typeProjector, float cutoffX, float cutoffZ)
+void fbpTomo::Setup(
+    int nBatches, 
+    size_t nx,
+    size_t ny,
+    size_t nz,
+    float dx,
+    float dy,
+    float dz,
+    float cx,
+    float cy,
+    float cz,
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float du,
+    float dv,
+    float off_u,
+    float off_v,
+    float dsd,
+    float dso,
+    int typeProjector,
+    float cutoffX,
+    float cutoffZ
+)
 {
-    Projector::Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz, nu, nv, nview, du, dv, off_u, off_v, dsd, dso, typeProjector);
+    Projector::Setup(
+        nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+        nu, nv, nview, du, dv, off_u, off_v, dsd, dso, typeProjector
+    );
 
     this->cutoffX = cutoffX;
     this->cutoffZ = cutoffZ;
@@ -43,9 +66,20 @@ float GetFrequency(int i, int filterLen, float du, float dx, float angleWeight, 
 }
 
 // always equispace
-void GetRampTomo(cufftComplex* pcuFreqKernel, float3* pDetCenter, float3* pSrc, 
-    size_t nview, size_t nu, float du, float dx, float dz, float cutoffX, float cutoffZ,
-    int filterType, cudaStream_t& stream)
+void GetRampTomo(
+    cufftComplex* pcuFreqKernel,
+    float3* pDetCenter,
+    float3* pSrc,
+    size_t nview,
+    size_t nu,
+    float du,
+    float dx,
+    float dz,
+    float cutoffX,
+    float cutoffZ,
+    int filterType,
+    cudaStream_t& stream
+)
 {
     int filterLen = 2 * nu - 1;
 
@@ -197,7 +231,7 @@ void GetRampTomo(cufftComplex* pcuFreqKernel, float3* pDetCenter, float3* pSrc,
 
         ostringstream oss;
         oss << "GetRampTomo() failed: " << e.what()
-                << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
         cerr << oss.str() << endl;
         throw runtime_error(oss.str().c_str());
     }
@@ -286,9 +320,15 @@ void fbpTomo::Filter(float* pcuFPrj, const float* pcuPrj, const float* pcuDetCen
 
                 // projection padding
                 cudaMemsetAsync(pcuPrjPad, 0, sizeof(float) * filterLen * nv, m_stream);
-                cudaMemcpy2DAsync(pcuPrjPad, filterLen * sizeof(float), 
-                                  pcuPrj + ib * nview * nu * nv + iview * nu * nv, nu * sizeof(float), 
-                                  nu * sizeof(float), nv, cudaMemcpyDeviceToDevice, m_stream);
+                cudaMemcpy2DAsync(
+                    pcuPrjPad,
+                    filterLen * sizeof(float), 
+                    pcuPrj + ib * nview * nu * nv + iview * nu * nv, nu * sizeof(float), 
+                    nu * sizeof(float),
+                    nv,
+                    cudaMemcpyDeviceToDevice,
+                    m_stream
+                );
                 cudaStreamSynchronize(m_stream);
                 
                 // filter
@@ -298,13 +338,21 @@ void fbpTomo::Filter(float* pcuFPrj, const float* pcuPrj, const float* pcuDetCen
                 cufftExecC2R(planInverse, pcuFreqPrj, pcuPrjPad);
 
                 // post scaling
-                Scale2D<<<blocks, threads, 0, m_stream>>>(pcuPrjPad + nu - 1, pcuPrjPad + nu - 1,
-                        scale, nu, nv, filterLen, filterLen);
+                Scale2D<<<blocks, threads, 0, m_stream>>>(
+                    pcuPrjPad + nu - 1, pcuPrjPad + nu - 1, scale, nu, nv, filterLen, filterLen
+                );
 
                 // get filtered projection
-                cudaMemcpy2DAsync(pcuFPrj + ib * nview * nu * nv + iview * nu * nv, nu * sizeof(float), 
-                                  pcuPrjPad + nu - 1, filterLen * sizeof(float), 
-                                  nu * sizeof(float), nv, cudaMemcpyDeviceToDevice, m_stream);
+                cudaMemcpy2DAsync(
+                    pcuFPrj + ib * nview * nu * nv + iview * nu * nv,
+                    nu * sizeof(float), 
+                    pcuPrjPad + nu - 1,
+                    filterLen * sizeof(float),
+                    nu * sizeof(float),
+                    nv,
+                    cudaMemcpyDeviceToDevice,
+                    m_stream
+                );
             }
         }
     }
@@ -319,8 +367,8 @@ void fbpTomo::Filter(float* pcuFPrj, const float* pcuPrj, const float* pcuDetCen
         if (pSrc != NULL) delete [] pSrc;
 
         ostringstream oss;
-        oss << "fbpFan::Filter() failed: " << e.what()
-                << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+        oss << "fbpTomo::Filter() failed: " << e.what()
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
         cerr << oss.str() << endl;
         throw runtime_error(oss.str().c_str());
     }
@@ -335,16 +383,30 @@ void fbpTomo::Filter(float* pcuFPrj, const float* pcuPrj, const float* pcuDetCen
 
 }
 
-extern "C" int cupyFbpTomoFilter(float* fprj, const float* prj,
-    const float* detCenter, const float* src,
-    int nBatches, size_t nu, size_t nv, size_t nview, float du, float dx, float dz,
-    int typeFilter = 0, float cutoffX = 1, float cutoffZ = 1)
+extern "C" int cupyFbpTomoFilter(
+    float* fprj,
+    const float* prj,
+    const float* detCenter,
+    const float* src,
+    int nBatches,
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float du,
+    float dx,
+    float dz,
+    int typeFilter = 0,
+    float cutoffX = 1,
+    float cutoffZ = 1
+)
 {
     try
 	{
 		fbpTomo projector;
-		projector.Setup(nBatches, 512, 512, 512, dx, 1, dz, 0, 0, 0,
-				nu, nv, nview, du, 1, 0, 0, 0, 0, typeFilter, cutoffX, cutoffZ);
+		projector.Setup(
+            nBatches, 512, 512, 512, dx, 1, dz, 0, 0, 0,
+            nu, nv, nview, du, 1, 0, 0, 0, 0, typeFilter, cutoffX, cutoffZ
+        );
 
 		projector.Filter(fprj, prj, detCenter, src);
 
@@ -353,7 +415,7 @@ extern "C" int cupyFbpTomoFilter(float* fprj, const float* prj,
 	{
 		ostringstream oss;
 		oss << "cupyFbpTomoFilter() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 

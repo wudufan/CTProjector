@@ -1,6 +1,8 @@
 #include "fbpMath.h"
 
-__global__ void ComplexMultiply2D(cufftComplex* res, const cufftComplex* op1, const cufftComplex* op2, size_t nx, size_t ny)
+__global__ void ComplexMultiply2D(
+    cufftComplex* res, const cufftComplex* op1, const cufftComplex* op2, size_t nx, size_t ny
+)
 {
     int ix = blockDim.x * blockIdx.x + threadIdx.x;
     int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -21,7 +23,9 @@ __global__ void ComplexMultiply2D(cufftComplex* res, const cufftComplex* op1, co
     res[ind] = val;
 }
 
-__global__ void FilterByFreqMultiply1D(cufftComplex* res, const cufftComplex* src, const cufftComplex* filter, size_t nx, size_t ny)
+__global__ void FilterByFreqMultiply1D(
+    cufftComplex* res, const cufftComplex* src, const cufftComplex* filter, size_t nx, size_t ny
+)
 {
     int ix = blockDim.x * blockIdx.x + threadIdx.x;
     int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -43,8 +47,9 @@ __global__ void FilterByFreqMultiply1D(cufftComplex* res, const cufftComplex* sr
 }
 
 // The pcuPrjPad is of size [nview, nuPad]
-__global__ void CopyPrjToPad(float* pcuPrjPad, const float* pcuPrj, int iv, 
-    size_t nu, size_t nuPad, size_t nv, size_t nview)
+__global__ void CopyPrjToPad(
+    float* pcuPrjPad, const float* pcuPrj, int iv, size_t nu, size_t nuPad, size_t nv, size_t nview
+)
 {
     int iu = blockIdx.x * blockDim.x + threadIdx.x;
     int iview = blockIdx.y * blockDim.y + threadIdx.y;
@@ -57,8 +62,9 @@ __global__ void CopyPrjToPad(float* pcuPrjPad, const float* pcuPrj, int iv,
     pcuPrjPad[iview * nuPad + iu] = pcuPrj[iview * nu * nv + iv * nu + iu];
 }
 
-__global__ void CopyPadToPrj(const float* pcuPrjPad, float* pcuPrj, int iv,
-    size_t nu, size_t nuPad, size_t nv, size_t nview)
+__global__ void CopyPadToPrj(
+    const float* pcuPrjPad, float* pcuPrj, int iv, size_t nu, size_t nuPad, size_t nv, size_t nview
+)
 {
     int iu = blockIdx.x * blockDim.x + threadIdx.x;
     int iview = blockIdx.y * blockDim.y + threadIdx.y;

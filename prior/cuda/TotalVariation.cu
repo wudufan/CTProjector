@@ -18,8 +18,9 @@ wx, wy, wz - weights for each direction.
 nx, ny, nz - size of the image
 eps - smoothness at the origin
 */
-__global__ void Variation3DKernel(float* var, const float* img, 
-    float wx, float wy, float wz, size_t nx, size_t ny, size_t nz, float eps)
+__global__ void Variation3DKernel(
+	float* var, const float* img, float wx, float wy, float wz, size_t nx, size_t ny, size_t nz, float eps
+)
 {
 	size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -65,8 +66,9 @@ img - input image.
 wx, wy, wz - weights for each direction.
 nx, ny, nz - size of the image
 */
-__global__ void TVSQS3DKernel(float* s1, float* s2, const float* var, const float* img, 
-    float wx, float wy, float wz, size_t nx, size_t ny, size_t nz)
+__global__ void TVSQS3DKernel(
+	float* s1, float* s2, const float* var, const float* img, float wx, float wy, float wz, size_t nx, size_t ny, size_t nz
+)
 {
 	size_t ix = blockIdx.x * blockDim.x + threadIdx.x;
 	size_t iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -145,8 +147,9 @@ __global__ void TVSQS3DKernel(float* s1, float* s2, const float* var, const floa
 
 // get first and second order derivatives of the surrogate function
 // get the variation of the image
-void TVSQS3D_gpu(float* s1, float* s2, float* var, const float* img, 
-    float wx, float wy, float wz, size_t nx, size_t ny, size_t nz, float eps)
+void TVSQS3D_gpu(
+	float* s1, float* s2, float* var, const float* img, float wx, float wy, float wz, size_t nx, size_t ny, size_t nz, float eps
+)
 {
 	dim3 threads(32, 16, 1);
 	dim3 blocks(ceilf(nx / (float)threads.x), ceilf(ny / (float)threads.y), nz);
@@ -156,8 +159,19 @@ void TVSQS3D_gpu(float* s1, float* s2, float* var, const float* img,
 
 }
 
-extern "C" void cTVSQS3D(float* s1, float* s2, float* var, const float* img, 
-    float wx, float wy, float wz, size_t nx, size_t ny, size_t nz, float eps = 1e-8f)
+extern "C" void cTVSQS3D(
+	float* s1,
+	float* s2,
+	float* var,
+	const float* img,
+    float wx,
+	float wy,
+	float wz,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float eps = 1e-8f
+)
 {
 	float* pcus1 = NULL;
 	float* pcus2 = NULL;

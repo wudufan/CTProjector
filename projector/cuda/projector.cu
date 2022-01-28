@@ -55,10 +55,28 @@ void Projector::SetCudaStream(const cudaStream_t& stream)
 	m_stream = stream;
 }
 
-void Projector::Setup(int nBatches, 
-		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v,
-		float dsd, float dso, int typeProjector)
+void Projector::Setup(
+	int nBatches, 
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v,
+	float dsd,
+	float dso,
+	int typeProjector
+)
 {
 	this->nBatches = nBatches;
 

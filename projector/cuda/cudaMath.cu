@@ -1,8 +1,17 @@
 #include "cudaMath.h"
 
 // res = op1 - lambda * op2
-__global__ void Minus2D(float* res, const float* op1, const float* op2,
-		int nx, int ny, int strideRes, int stride1, int stride2, float lambda)
+__global__ void Minus2D(
+	float* res,
+	const float* op1,
+	const float* op2,
+	int nx,
+	int ny,
+	int strideRes,
+	int stride1,
+	int stride2,
+	float lambda
+)
 {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
 	int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -16,8 +25,16 @@ __global__ void Minus2D(float* res, const float* op1, const float* op2,
 }
 
 // res = op1 * op2
-__global__ void Multiply2D(float* res, const float* op1, const float* op2,
-		int nx, int ny, int strideRes, int stride1, int stride2)
+__global__ void Multiply2D(
+	float* res,
+	const float* op1,
+	const float* op2,
+	int nx,
+	int ny,
+	int strideRes,
+	int stride1,
+	int stride2
+)
 {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
 	int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -31,8 +48,17 @@ __global__ void Multiply2D(float* res, const float* op1, const float* op2,
 }
 
 // res = op1 / (op2 + epsilon)
-__global__ void Divide2D(float* res, const float* op1, const float* op2,
-		int nx, int ny, int strideRes, int stride1, int stride2, float epsilon)
+__global__ void Divide2D(
+	float* res,
+	const float* op1,
+	const float* op2,
+	int nx,
+	int ny,
+	int strideRes,
+	int stride1,
+	int stride2,
+	float epsilon
+)
 {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
 	int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -47,8 +73,15 @@ __global__ void Divide2D(float* res, const float* op1, const float* op2,
 
 
 // res = op * scale
-__global__ void Scale2D(float* res, const float* op, float scale,
-		int nx, int ny, int strideRes, int strideOp)
+__global__ void Scale2D(
+	float* res,
+	const float* op,
+	float scale,
+	int nx,
+	int ny,
+	int strideRes,
+	int strideOp
+)
 {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
 	int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -63,8 +96,16 @@ __global__ void Scale2D(float* res, const float* op, float scale,
 
 // res[res < lb] = lb
 // res[res > ub] = ub
-__global__ void ValueCrop2D(float* res, const float* op, float lb, float ub,
-		int nx, int ny, int strideRes, int strideOp)
+__global__ void ValueCrop2D(
+	float* res,
+	const float* op,
+	float lb,
+	float ub,
+	int nx,
+	int ny,
+	int strideRes,
+	int strideOp
+)
 {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
 	int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -170,14 +211,15 @@ __device__ double InterpolateXY(const double* buff, float x, float y, int iz, si
 	ix1 = Clamp(ix1, 0, nx);
 	iy1 = Clamp(iy1, 0, ny);
 
-
 	double wx = (x - ix);
 	double wy = (y - iy);
 
-	return double(buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wy) +
-				  buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wy) +
-				  buff[iz * nx * ny + iy1 * nx + ix] * (1 - wx) * wy +
-				  buff[iz * nx * ny + iy1 * nx + ix1] * wx * wy);
+	return double(
+		buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wy)
+		+ buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wy) 
+		+ buff[iz * nx * ny + iy1 * nx + ix] * (1 - wx) * wy 
+		+ buff[iz * nx * ny + iy1 * nx + ix1] * wx * wy
+	);
 
 }
 
@@ -205,17 +247,17 @@ __device__ float InterpolateXY(const float* buff, float x, float y, int iz, size
 	ix1 = Clamp(ix1, 0, nx);
 	iy1 = Clamp(iy1, 0, ny);
 
-
 	float wx = (x - ix);
 	float wy = (y - iy);
 
-	return float(buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wy) +
-				 buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wy) +
-				 buff[iz * nx * ny + iy1 * nx + ix] * (1 - wx) * wy +
-				 buff[iz * nx * ny + iy1 * nx + ix1] * wx * wy);
+	return float(
+		buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wy)
+		+ buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wy)
+		+ buff[iz * nx * ny + iy1 * nx + ix] * (1 - wx) * wy
+		+ buff[iz * nx * ny + iy1 * nx + ix1] * wx * wy
+	);
 
 }
-
 
 // 2d interpolation
 __device__ float InterpolateXZ(const float* buff, float x, int iy, float z, size_t nx, size_t ny, size_t nz, bool truncate)
@@ -241,14 +283,15 @@ __device__ float InterpolateXZ(const float* buff, float x, int iy, float z, size
 	ix1 = Clamp(ix1, 0, nx);
 	iz1 = Clamp(iz1, 0, nz);
 
-
 	float wx = (x - ix);
 	float wz = (z - iz);
 
-	return float(buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wz) +
-				 buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wz) +
-				 buff[iz1 * nx * ny + iy * nx + ix] * (1 - wx) * wz +
-				 buff[iz1 * nx * ny + iy * nx + ix1] * wx * wz);
+	return float(
+		buff[iz * nx * ny + iy * nx + ix] * (1 - wx) * (1 - wz)
+		+ buff[iz * nx * ny + iy * nx + ix1] * wx * (1 - wz)
+		+ buff[iz1 * nx * ny + iy * nx + ix] * (1 - wx) * wz
+		+ buff[iz1 * nx * ny + iy * nx + ix1] * wx * wz
+	);
 
 }
 
@@ -279,9 +322,11 @@ __device__ float InterpolateYZ(const float* buff, int ix, float y, float z, size
 	float wy = (y - iy);
 	float wz = (z - iz);
 
-	return float(buff[iz * nx * ny + iy * nx + ix] * (1 - wy) * (1 - wz) +
-				 buff[iz * nx * ny + iy1 * nx + ix] * wy * (1 - wz) +
-				 buff[iz1 * nx * ny + iy * nx + ix] * (1 - wy) * wz +
-				 buff[iz1 * nx * ny + iy1 * nx + ix] * wy * wz);
+	return float(
+		buff[iz * nx * ny + iy * nx + ix] * (1 - wy) * (1 - wz)
+		+ buff[iz * nx * ny + iy1 * nx + ix] * wy * (1 - wz)
+		+ buff[iz1 * nx * ny + iy * nx + ix] * (1 - wy) * wz
+		+ buff[iz1 * nx * ny + iy1 * nx + ix] * wy * wz
+	);
 
 }

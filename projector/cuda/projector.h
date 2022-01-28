@@ -27,8 +27,9 @@ struct Detector
 	float off_v;
 };
 
-inline __device__ __host__ Grid MakeGrid(size_t nx, size_t ny, size_t nz, float dx, float dy, float dz,
-		float cx, float cy, float cz)
+inline __device__ __host__ Grid MakeGrid(
+	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz
+)
 {
 	Grid grid;
 	grid.nx = nx;
@@ -44,7 +45,9 @@ inline __device__ __host__ Grid MakeGrid(size_t nx, size_t ny, size_t nz, float 
 	return grid;
 }
 
-inline __device__ __host__ Detector MakeDetector(size_t nu, size_t nv, float du, float dv, float off_u, float off_v)
+inline __device__ __host__ Detector MakeDetector(
+	size_t nu, size_t nv, float du, float dv, float off_u, float off_v
+)
 {
 	Detector det;
 	det.nu = nu;
@@ -127,10 +130,28 @@ public:
 
 
 public:
-	void Setup(int nBatches, 
-		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v,
-		float dsd, float dso, int typeProjector = 0);
+	void Setup(
+		int nBatches, 
+		size_t nx,
+		size_t ny,
+		size_t nz,
+		float dx,
+		float dy,
+		float dz,
+		float cx,
+		float cy,
+		float cz,
+		size_t nu,
+		size_t nv,
+		size_t nview,
+		float du,
+		float dv,
+		float off_u,
+		float off_v,
+		float dsd,
+		float dso,
+		int typeProjector = 0
+	);
 
 public:
 	void SetCudaStream(const cudaStream_t& stream);

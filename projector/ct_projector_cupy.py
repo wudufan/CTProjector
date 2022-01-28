@@ -1,5 +1,10 @@
+'''
+Cupy-based wrapper of the CUDA functions. Compared to numpy wrapper, it reduces memory transfer
+between CPU and GPU but costs more GPU memory.
+'''
+
 from ctypes import cdll, c_int, c_void_p, c_ulong, c_float
-from typing import Callable
+from typing import Callable, Union
 
 import os
 import cupy as cp
@@ -33,7 +38,7 @@ class ct_projector:
         self.off_u = 0
         self.off_v = 0
 
-    def from_file(self, filename: str):
+    def from_file(self, filename: str) -> None:
         '''
         Load the geometry from config filename.
         '''
@@ -53,50 +58,87 @@ class ct_projector:
         self.ny = int(self.ny)
         self.nz = int(self.nz)
 
-    def set_projector(self, projector: Callable[..., cp.array], **kwargs):
+    def set_projector(self, projector: Callable[..., cp.array], **kwargs) -> None:
         '''
-        Set the projector. The projector will be called as projector(img, **kwargs)
+        Set the projector. After the projector is set, one can call ct_projector.fp()
+        or ct_projector.fp2() to use the projector. This will enable same reconstruction
+        algorithm with different projectors.
+        The set projector will be called as projector(image, **kwargs), where the image is
+        an array, and it will return an array of projection.
 
         Parameters
         -----------------
         projector: callback function.
-            It takes the first parameter a cp.array image, and the rest parameters given by **kwargs.
+            It takes the first parameter an image array, and the rest parameters given by **kwargs.
             The return value should be the forward projections in cp.array.
         **kwargs: parameters.
-            kwargs to be parsed when calling the projector. For example, one can pass what filters
-            should be used for a filter-backprojector.
+            kwargs to be parsed when calling the projector. For example, one can pass how many
+            angles are there for the projector.
         '''
         self.projector = projector
         self.fp_kwargs = kwargs
 
-    def set_backprojector(self, backprojector, **kwargs):
+    def set_backprojector(self, backprojector: Callable[..., cp.array], **kwargs) -> None:
         '''
-        Set the backprojector. So that the bp can be called by bp/bp2.
+        Set the backprojector. After the backprojector is set, one can call ct_projector.bp()
+        or ct_projector.bp2() to use the backprojector. This will enable same reconstruction
+        algorithm with different projectors.
+        The set projector will be called as backprojector(prj, **kwargs), where the prj is
+        an array, and it will return an array of image.
+
+        Parameters
+        -----------------
+        projector: callback function.
+            It takes the first parameter a projection array, and the rest parameters given by **kwargs.
+            The return value should be the back projections (an image) in array.
+        **kwargs: parameters.
+            kwargs to be parsed when calling the backprojector. For example, one can pass how many
+            angles are there for the projector.
         '''
         self.backprojector = backprojector
         self.bp_kwargs = kwargs
 
-    def fp(self, img):
+    def fp(self, img: cp.array) -> cp.array:
+        '''
+        Generic forward projection function.
+        '''
         return self.projector(img, **(self.fp_kwargs))
 
-    def bp(self, prj):
+    def bp(self, prj: cp.array) -> cp.array:
+        '''
+        Generic backprojection function.
+        '''
         return self.backprojector(prj, **(self.bp_kwargs))
 
-    def fp2(self, img, **kwargs):
+    def fp2(self, img: cp.array, **kwargs) -> cp.array:
         '''
-        Use passed kwargs. Useful for OS iterations
+        Generic forward projection function, the **kwargs will override
+        the default params set by self.set_projector.
         '''
         return self.projector(img, **kwargs)
 
-    def bp2(self, prj, **kwargs):
+    def bp2(self, prj: cp.array, **kwargs) -> cp.array:
         '''
-        Use passed kwargs. Useful for OS iterations
+        Generic backprojection function, the **kwargs will override
+        the default params set by self.set_backprojector.
         '''
         return self.backprojector(prj, **kwargs)
 
-    def calc_projector_norm(self, weight=None, niter=10):
+    def calc_projector_norm(self, weight: cp.array = None, niter: int = 10) -> float:
         '''
-        Use power method to calculate the norm of the projector
+        Use power method to calculate the norm of the projector.
+
+        Parameters
+        ----------------------
+        weight: cp.array of size [1, self.nz, self.ny, self.nx]
+            The weighting matrix as in A^TwA when calculating the norm of projector A.
+        niter: int.
+            Number of iterations for the power method.
+
+        Returns
+        --------------------
+        norm: float.
+            The norm of the projector A, or sqrt(w)A with weighting matrix.
         '''
         if weight is not None:
             weight = cp.sqrt(weight)
@@ -117,9 +159,19 @@ class ct_projector:
 
         return norm
 
-    def calc_norm_img(self, weight=None):
+    def calc_norm_img(self, weight: cp.array = None) -> cp.array:
         '''
         Calculate norm_img = A.T*w*A*1
+
+        Parameters
+        --------------
+        weight: cp.array of size [1, self.nz, self.ny, self.nx].
+            The weighting matrix as in A^TwA.
+
+        Returns
+        -------------
+        norm_img: cp.array.
+            The calculated norm image.
         '''
         if weight is None:
             weight = 1
@@ -127,37 +179,57 @@ class ct_projector:
         x = cp.ones([1, self.nz, self.ny, self.nx], dtype=cp.float32)
         return self.bp(self.fp(x) * weight)
 
-    def set_device(self, device):
+    def set_device(self, device: int) -> int:
+        '''
+        Set the computing device and return any error code.
+        '''
         return module.SetDevice(c_int(device))
 
-    def get_angles(self):
+    def get_angles(self) -> np.array:
+        '''
+        Get the angles for each view in circular geometry.
+        '''
         return np.arange(0, self.nview, dtype=np.float32) * 2 * np.pi / self.nview
 
-    def siddon_cone_fp_abitrary(self, img, det_center, det_u, det_v, src):
+    def siddon_cone_fp_arbitrary(
+        self,
+        img: cp.array,
+        det_center: cp.array,
+        det_u: cp.array,
+        det_v: cp.array,
+        src: cp.array
+    ) -> cp.array:
         '''
-        Conebeam forward projection with abitrary geomety and flat panel. Using Siddon ray tracing.
+        Conebeam forward projection with arbitrary geometry and flat panel. Using Siddon ray tracing.
+        The size of the img will override that of self.nx, self.ny, self.nz. The projection size
+        will be [batch, nview, self.nv, self.nu].
 
         Parameters
         -------------------------
-        img: 
-        the image to be projected, of size [batch, nz, ny, nx]
-        @det_center: the center of the detector in mm, of size [nview, 3]
-        @det_u: the u axis of the detector, normalized, of size [nview, 3]
-        @det_v: the v axis of the detector, normalized, of size [nview, 3]
-        @src: the src positions, in mm, of size [nview, 3]
+        img: cp.array(float32) of size [batch, nz, ny, nx].
+            The image to be projected, nz, ny, nx can be different than self.nz, self.ny, self.nx.
+            The projector will always use the size of the image.
+        det_center: cp.array(float32) of size [nview, 3].
+            The center of the detector in mm. Each row records the center of detector as (z, y, x).
+        det_u: cp.array(float32) of size [nview, 3].
+            The u axis of the detector. Each row is a normalized vector in (z, y, x).
+        det_v: cp.array(float32) of size [nview ,3].
+            The v axis of the detector. Each row is a normalized vector in (z, y, x).
+        src: cp.array(float32) of size [nview, 3].
+            The src positions in mm. Each row records in the source position as (z, y, x).
 
-        @return: 
-        @prj: the forward projection, of size [batch, nview, self.nv, self.nu]
-
-        batch, nx, ny, nz, nview will be automatically derived from the parameters. The projection size should be set by self.nu and self.nv
+        Returns
+        -------------------------
+        prj: cp.array(float32) of size [batch, self.nview, self.nv, self.nu].
+            The forward projection.
         '''
 
         # projection of size
         prj = cp.zeros([img.shape[0], det_center.shape[0], self.nv, self.nu], cp.float32)
 
-        module.cupySiddonConeProjectionAbitrary.restype = c_int
+        module.cupySiddonConeProjectionArbitrary.restype = c_int
 
-        err = module.cupySiddonConeProjectionAbitrary(
+        err = module.cupySiddonConeProjectionArbitrary(
             c_void_p(prj.data.ptr),
             c_void_p(img.data.ptr),
             c_void_p(det_center.data.ptr),
@@ -188,30 +260,46 @@ class ct_projector:
 
         return prj
 
-    def siddon_cone_bp_abitrary(self, prj, det_center, det_u, det_v, src):
+    def siddon_cone_bp_arbitrary(
+        self,
+        prj: cp.array,
+        det_center: cp.array,
+        det_u: cp.array,
+        det_v: cp.array,
+        src: cp.array
+    ) -> cp.array:
         '''
-        Conebeam backprojection with abitrary geomety and flat panel. Using Siddon ray tracing
-        @params:
-        @prj: the projection to be backprojected, of size [batch, nview, nv, nu]
-        @det_center: the center of the detector in mm, of size [nview, 3]
-        @det_u: the u axis of the detector, normalized, of size [nview, 3]
-        @det_v: the v axis of the detector, normalized, of size [nview, 3]
-        @src: the src positions, in mm, of size [nview, 3]
-        
-        @return:
-        @img: the backprojection, of size [batch, self.nz, self.ny, self.nx]
-        
-        batch, nu, nv, nview will be automatically derived from the parameters. The image size should be set by self.nx, self.ny, and self.nz
-        '''
-        
-        # make sure they are float32
-        
-        # projection of size 
-        img = cp.zeros([prj.shape[0], self.nz, self.ny, self.nx], cp.float32)
-        
-        module.cupySiddonConeBackprojectionAbitrary.restype = c_int
+        Conebeam backprojection with arbitrary geometry and flat panel. Using Siddon ray tracing.
+        The size of the img will override that of self.nx, self.ny, self.nz. The projection size
+        will be [batch, nview, self.nv, self.nu].
 
-        err = module.cupySiddonConeBackprojectionAbitrary(
+        Parameters
+        -------------------------
+        prj: cp.array(float32) of size [batch, nview, nv, nu].
+            The projection to be backprojected. It will override the default shape predefined,
+            i.e. self.nview, self.nv, self.nu.
+        det_center: cp.array(float32) of size [nview, 3].
+            The center of the detector in mm. Each row records the center of detector as (z, y, x).
+        det_u: cp.array(float32) of size [nview, 3].
+            The u axis of the detector. Each row is a normalized vector in (z, y, x).
+        det_v: cp.array(float32) of size [nview ,3].
+            The v axis of the detector. Each row is a normalized vector in (z, y, x).
+        src: cp.array(float32) of size [nview, 3].
+            The src positions in mm. Each row records in the source position as (z, y, x).
+
+        Returns
+        -------------------------
+        img: cp.array(float32) of size [batch, self.nz, self.ny, self.nx].
+            The backprojected image.
+        '''
+
+        # make sure they are float32
+        # projection of size
+        img = cp.zeros([prj.shape[0], self.nz, self.ny, self.nx], cp.float32)
+
+        module.cupySiddonConeBackprojectionArbitrary.restype = c_int
+
+        err = module.cupySiddonConeBackprojectionArbitrary(
             c_void_p(img.data.ptr),
             c_void_p(prj.data.ptr),
             c_void_p(det_center.data.ptr),
@@ -242,18 +330,33 @@ class ct_projector:
 
         return img
 
-    def distance_driven_fp_tomo(self, img, det_center, src):
+    def distance_driven_fp_tomo(
+        self,
+        img: cp.array,
+        det_center: cp.array,
+        src: cp.array
+    ) -> cp.array:
         '''
-        Distance driven forward projection for tomosynthesis. It assumes that the detector has u=(1,0,0) and v = (0,1,0).
-        The projection should be along the z-axis (main axis for distance driven projection)
-        
-        @params:
-        @img: original image, of size (batch, nz, ny, nx)
-        @det_center: centers of the detector for each projection, of size (nview, 3)
-        @src: position of the source for each projection, of size (nview ,3)
+        Distance driven forward projection for tomosynthesis. It assumes that the detector has
+        u=(1,0,0) and v = (0,1,0).
+        The projection should be along the z-axis (main axis for distance driven projection).
+        The img size will override the default predefined shape. The forward projection shape
+        will be [batch, self.nview, self.nv, self.nu].
 
-        @return:
-        @prj: the forward projection of size (batch, nview, nv, nu)
+        Parameters
+        -------------------
+        img: cp.array(float32) of size (batch, nz, ny, nx).
+            The image to be projected, nz, ny, nx can be different than self.nz, self.ny, self.nx.
+            The projector will always use the size of the image.
+        det_center: cp.array(float32) of size [nview, 3].
+            The center of the detector in mm. Each row records the center of detector as (z, y, x).
+        src: cp.array(float32) of size [nview, 3].
+            The src positions in mm. Each row records in the source position as (z, y, x).
+
+        Returns
+        -------------------------
+        prj: cp.array(float32) of size [batch, self.nview, self.nv, self.nu].
+            The forward projection.
         '''
         prj = cp.zeros([img.shape[0], det_center.shape[0], self.nv, self.nu], cp.float32)
 
@@ -287,18 +390,33 @@ class ct_projector:
 
         return prj
 
-    def distance_driven_bp_tomo(self, prj, det_center, src):
+    def distance_driven_bp_tomo(
+        self,
+        prj: cp.array,
+        det_center: cp.array,
+        src: cp.array
+    ) -> cp.array:
         '''
-        Distance driven backprojection for tomosynthesis. It assumes that the detector has u=(1,0,0) and v = (0,1,0).
-        The backprojection should be along the z-axis (main axis for distance driven projection)
+        Distance driven backprojection for tomosynthesis. It assumes that the detector has
+        u=(1,0,0) and v = (0,1,0).
+        The backprojection should be along the z-axis (main axis for distance driven projection).
+        The size of the img will override that of self.nx, self.ny, self.nz. The projection size
+        will be [batch, nview, self.nv, self.nu].
 
-        @params:
-        @prj: the projection to BP, of size (batch, nview, nv, nu)
-        @det_center: centers of the detector for each projection, of size (nview, 3)
-        @src: position of the source for each projection, of size (nview ,3)
+        Parameters
+        -------------------------
+        prj: cp.array(float32) of size [batch, nview, nv, nu].
+            The projection to be backprojected. It will override the default shape predefined,
+            i.e. self.nview, self.nv, self.nu.
+        det_center: cp.array(float32) of size [nview, 3].
+            The center of the detector in mm. Each row records the center of detector as (z, y, x).
+        src: cp.array(float32) of size [nview, 3].
+            The src positions in mm. Each row records in the source position as (z, y, x).
 
-        @return:
-        @img: the backprojection image, of size (batch, nz, ny, nx)
+        Returns
+        -------------------------
+        img: cp.array(float32) of size [batch, self.nz, self.ny, self.nx].
+            The backprojected image.
         '''
 
         img = cp.zeros([prj.shape[0], self.nz, self.ny, self.nx], cp.float32)
@@ -333,15 +451,25 @@ class ct_projector:
 
         return img
 
-    def distance_driven_fan_fp(self, img, angles):
+    def distance_driven_fan_fp(
+        self,
+        img: cp.array,
+        angles: cp.array
+    ) -> cp.array:
         '''
         Fanbeam forward projection with circular equiangular detector. Distance driven.
-        @params:
-        @img: float32 cuarray of size [batch, nz, ny, nx], the image to be projected 
-        @angles: float32 cuarray of size [nview], the projection angles
 
-        @return:
-        @prj: float32 cuarray of size [batch, nview, nv, nu], the forward projection
+        Parameters
+        ----------------
+        img: cp.array(float32) of size [batch, nz, ny, nx]
+            The image to be projected.
+        angles: cp.array(float32) of size [nview]
+            The projection angles in radius.
+
+        Returns
+        --------------
+        prj: cp.array(float32) of size [batch, self.nview, self.nv, self.nu]
+            The forward projection.
         '''
         prj = cp.zeros([img.shape[0], len(angles), self.nv, self.nu], cp.float32)
 
@@ -377,16 +505,29 @@ class ct_projector:
 
         return prj
 
-    def distance_driven_fan_bp(self, prj, angles, is_fbp=False):
+    def distance_driven_fan_bp(
+        self,
+        prj: cp.array,
+        angles: cp.array,
+        is_fbp: Union[bool, int] = False
+    ) -> cp.array:
         '''
-        Fanbeam backprojection with circular equiangular detector. Distance driven
-        @params:
-        @prj: cuarray of shape [batch, nview , nv, nu], the projection to be backprojected
-        @angles: cuarray of shape [nview], the projection angles in rads
-        @is_fbp: is True, use the FBP weighting scheme rather than iterative recon weighting
+        Fanbeam backprojection with circular equiangular detector. Distance driven.
 
-        @return:
-        @img: cuarray of shape [batch, nz, ny, nx], the backprojected image
+        Parameters
+        ----------------
+        prj: cp.array(float32) of size [batch, nview, nv, nu].
+            The projection to be backprojected. The size does not need to be the same
+            with self.nview, self.nv, self.nu.
+        angles: cp.array(float32) of size [nview].
+            The projection angles in radius.
+        is_fbp: bool.
+            if true, use the FBP weighting scheme to backproject filtered data.
+
+        Returns
+        --------------
+        img: cp.array(float32) of size [batch, self.nz, self.ny, self.nx]
+            The backprojected image.
         '''
 
         img = cp.zeros([prj.shape[0], self.nz, self.ny, self.nx], cp.float32)
@@ -428,7 +569,39 @@ class ct_projector:
 
         return img
 
-    def filter_tomo(self, prj, det_center, src, filter_type='hann', cutoff_x=1, cutoff_y=1):
+    def filter_tomo(
+        self,
+        prj: cp.array,
+        det_center: cp.array,
+        src: cp.array,
+        filter_type: str = 'hann',
+        cutoff_x: float = 1,
+        cutoff_y: float = 1
+    ) -> cp.array:
+        '''
+        Filter of the projection for tomosynthesis reconstruction.
+
+        Parameters
+        ------------------
+        prj: cp.array(float32) of size [batch, nview, nv, nu].
+            The projection to be filtered. It will override the default shape predefined,
+            i.e. self.nview, self.nv, self.nu.
+        det_center: cp.array(float32) of size [nview, 3].
+            The center of the detector in mm. Each row records the center of detector as (z, y, x).
+        src: cp.array(float32) of size [nview, 3].
+            The src positions in mm. Each row records in the source position as (z, y, x).
+        filter_type: str (case insensitive).
+            'hamming', 'hann', or other. If other than 'hamming' or 'hann', use ramp filter.
+        cutoff_x: float.
+            Cutoff frequency along u direction, value between (0, 1].
+        cutoff_y: float.
+            Cutoff frequency along v direction, value between (0, 1].
+
+        Returns
+        ------------------
+        fprj: cp.array(float32) of shape [batch, nview, nv, nu].
+            The filtered projection.
+        '''
         if filter_type.lower() == 'hamming':
             ifilter = 1
         elif filter_type.lower() == 'hann':

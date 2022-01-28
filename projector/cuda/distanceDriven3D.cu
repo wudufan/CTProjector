@@ -11,8 +11,9 @@
 using namespace std;
 
 // DD projection branchless version
-__device__ __host__ static float3 GetDstForCone(float u, float v,
-		const float3& detCenter, const float3& detU, const float3& detV)
+__device__ __host__ static float3 GetDstForCone(
+	float u, float v, const float3& detCenter, const float3& detU, const float3& detV
+)
 {
 	return make_float3(detCenter.x + detU.x * u + detV.x * v,
 		detCenter.y + detU.y * u + detV.y * v,
@@ -80,10 +81,19 @@ Distance driven projection. The projection should always be performed with z axi
 iviews - the list of iview where DDFP is performed on the XY plane
 nValidViews - length of iviews
 */
-__global__ void DDFPConeKernelXY(float* pPrjs, const double* acc,
-		const int* iviews, int nValidViews, int nview,
-		const float3* pDetCenter, const float3* pDetU, const float3* pDetV, const float3* pSrc,
-		const Grid grid, const Detector det)
+__global__ void DDFPConeKernelXY(
+	float* pPrjs,
+	const double* acc,
+	const int* iviews,
+	int nValidViews,
+	int nview,
+	const float3* pDetCenter,
+	const float3* pDetU,
+	const float3* pDetV,
+	const float3* pSrc,
+	const Grid grid,
+	const Detector det
+)
 {
 	int iu = blockDim.x * blockIdx.x + threadIdx.x;
 	int iv = blockDim.y * blockIdx.y + threadIdx.y;
@@ -145,10 +155,12 @@ __global__ void DDFPConeKernelXY(float* pPrjs, const double* acc,
 		float y1 = src.y + ry1 * (iz - src.z);
 		float y2 = src.y + ry2 * (iz - src.z);
 
-		val += (InterpolateXY(acc, x2, y2, iz, grid.nx+1, grid.ny+1, grid.nz)
-				+ InterpolateXY(acc, x1, y1, iz, grid.nx+1, grid.ny+1, grid.nz)
-				- InterpolateXY(acc, x2, y1, iz, grid.nx+1, grid.ny+1, grid.nz)
-				- InterpolateXY(acc, x1, y2, iz, grid.nx+1, grid.ny+1, grid.nz)) / ((x2 - x1) * (y2 - y1));
+		val += (
+			InterpolateXY(acc, x2, y2, iz, grid.nx + 1, grid.ny + 1, grid.nz)
+			+ InterpolateXY(acc, x1, y1, iz, grid.nx + 1, grid.ny + 1, grid.nz)
+			- InterpolateXY(acc, x2, y1, iz, grid.nx + 1, grid.ny + 1, grid.nz)
+			- InterpolateXY(acc, x1, y2, iz, grid.nx + 1, grid.ny + 1, grid.nz)
+		) / ((x2 - x1) * (y2 - y1));
 
 	}
 
@@ -156,7 +168,9 @@ __global__ void DDFPConeKernelXY(float* pPrjs, const double* acc,
 	// use physics coordinate
 	float3 dst = GetDstForCone(u, v, pDetCenter[iview], pDetU[iview], pDetV[iview]);
 	src = pSrc[iview];
-	val *= grid.dz / fabsf((src.z - dst.z)) * sqrtf((src.z-dst.z)*(src.z-dst.z) + (src.y-dst.y)*(src.y-dst.y) + (src.x-dst.x)*(src.x-dst.x));
+	val *= grid.dz / fabsf((src.z - dst.z)) * sqrtf(
+		(src.z - dst.z) * (src.z - dst.z) + (src.y - dst.y) * (src.y-dst.y) + (src.x - dst.x) * (src.x - dst.x)
+	);
 
 	pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] = val;
 
@@ -173,7 +187,7 @@ void DistanceDrivenTomo::ProjectionTomo(const float* pcuImg, float* pcuPrj, cons
 
 	try
 	{
-		if (cudaSuccess != cudaMalloc(&pAcc, sizeof(double) * (nx+1) * (ny+1) * nz))
+		if (cudaSuccess != cudaMalloc(&pAcc, sizeof(double) * (nx + 1) * (ny + 1) * nz))
 		{
 			throw runtime_error("pAcc allocation failed");
 		}
@@ -268,11 +282,29 @@ void DistanceDrivenTomo::ProjectionTomo(const float* pcuImg, float* pcuPrj, cons
 }
 
 // C interface
-extern "C" int cDistanceDrivenTomoProjection(float* prj, const float* img,
-		const float* detCenter, const float* src,
-		size_t nBatches,
-		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
+extern "C" int cDistanceDrivenTomoProjection(
+	float* prj,
+	const float* img,
+	const float* detCenter,
+	const float* src,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v
+)
 {
 	float* pcuPrj = NULL;
 	float* pcuImg = NULL;
@@ -304,8 +336,10 @@ extern "C" int cDistanceDrivenTomoProjection(float* prj, const float* img,
 		cudaMemset(pcuPrj, 0, sizeof(float) * nu * nview * nv * nBatches);
 
 		DistanceDrivenTomo projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0
+		);
 
 		projector.ProjectionTomo(pcuImg, pcuPrj, pcuDetCenter, pcuSrc);
 		cudaMemcpy(prj, pcuPrj, sizeof(float) * nu * nv * nview * nBatches, cudaMemcpyDeviceToHost);
@@ -314,7 +348,7 @@ extern "C" int cDistanceDrivenTomoProjection(float* prj, const float* img,
 	{
 		ostringstream oss;
 		oss << "cDistanceDrivenTomoProjection() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 
@@ -327,17 +361,37 @@ extern "C" int cDistanceDrivenTomoProjection(float* prj, const float* img,
 
 }
 
-extern "C" int cupyDistanceDrivenTomoProjection(float* prj, const float* img,
-	const float* detCenter, const float* src,
+extern "C" int cupyDistanceDrivenTomoProjection(
+	float* prj,
+	const float* img,
+	const float* detCenter,
+	const float* src,
 	size_t nBatches,
-	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v
+)
 {
 	try
 	{
 		DistanceDrivenTomo projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0
+		);
 
 		projector.ProjectionTomo(img, prj, detCenter, src);
 	}
@@ -345,7 +399,7 @@ extern "C" int cupyDistanceDrivenTomoProjection(float* prj, const float* img,
 	{
 		ostringstream oss;
 		oss << "cDistanceDrivenTomoProjection() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 
@@ -353,9 +407,16 @@ extern "C" int cupyDistanceDrivenTomoProjection(float* prj, const float* img,
 }
 
 // preweight the projection data by the approximated ray length in a pixel
-__global__ void PreweightBPCartKernelXY(float* pPrjs,
-		const int* iviews, size_t nValidViews, size_t nview, 
-		const float3* pDetCenter, const float3* pSrc, float dz, const Detector det)
+__global__ void PreweightBPCartKernelXY(
+	float* pPrjs,
+	const int* iviews,
+	size_t nValidViews,
+	size_t nview,
+	const float3* pDetCenter,
+	const float3* pSrc,
+	float dz,
+	const Detector det
+)
 {
 	int iu = blockIdx.x * blockDim.x + threadIdx.x;
 	int iv = blockIdx.y * blockDim.y + threadIdx.y;
@@ -373,8 +434,9 @@ __global__ void PreweightBPCartKernelXY(float* pPrjs,
 	float3 dst = GetDstForCone(u, v, pDetCenter[iview], make_float3(1,0,0), make_float3(0,1,0));
 	float3 src = pSrc[iview];
 
-	pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] *= 
-		dz / fabsf((src.z - dst.z)) * sqrtf((src.z-dst.z)*(src.z-dst.z) + (src.y-dst.y)*(src.y-dst.y) + (src.x-dst.x)*(src.x-dst.x));;
+	pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] *= dz / fabsf((src.z - dst.z)) * sqrtf(
+			(src.z - dst.z) * (src.z - dst.z) + (src.y - dst.y) * (src.y - dst.y) + (src.x - dst.x) * (src.x - dst.x)
+		);
 }
 
 // dst has the dimension (batch, nview, nv+1, nu+1)
@@ -434,10 +496,17 @@ __device__ static float2 ProjectConeToDetCart(float3 pt, float3 detCenter, float
 }
 
 // BP when detector aligns with the cartesian coordinate
-__global__ void DDBPConeCartKernelXY(float* pImg, const double* acc,
-		const int* iviews, size_t nValidViews, size_t nview,
-		const float3* pDetCenter, const float3* pSrc,
-		const Grid grid, const Detector det)
+__global__ void DDBPConeCartKernelXY(
+	float* pImg,
+	const double* acc,
+	const int* iviews,
+	size_t nValidViews,
+	size_t nview,
+	const float3* pDetCenter,
+	const float3* pSrc,
+	const Grid grid,
+	const Detector det
+)
 {
 	int ix = blockDim.x * blockIdx.x + threadIdx.x;
 	int iy = blockDim.y * blockIdx.y + threadIdx.y;
@@ -465,10 +534,12 @@ __global__ void DDBPConeCartKernelXY(float* pImg, const double* acc,
 		float v2 = ProjectConeToDetCart(make_float3(x, y + grid.dy / 2, z), detCenter, src, det).y;
 
 
-		val += (InterpolateXY(acc, u2, v2, iview, det.nu + 1, det.nv + 1, nview)
-				- InterpolateXY(acc, u2, v1, iview, det.nu + 1, det.nv + 1, nview)
-				+ InterpolateXY(acc, u1, v1, iview, det.nu + 1, det.nv + 1, nview)
-				- InterpolateXY(acc, u1, v2, iview, det.nu + 1, det.nv + 1, nview)) / ((u2 - u1) * (v2 - v1));
+		val += (
+			InterpolateXY(acc, u2, v2, iview, det.nu + 1, det.nv + 1, nview)
+			- InterpolateXY(acc, u2, v1, iview, det.nu + 1, det.nv + 1, nview)
+			+ InterpolateXY(acc, u1, v1, iview, det.nu + 1, det.nv + 1, nview)
+			- InterpolateXY(acc, u1, v2, iview, det.nu + 1, det.nv + 1, nview)
+		) / ((u2 - u1) * (v2 - v1));
 
 		// pImg[iz * grid.nx * grid.ny + iy * grid.nx + ix] = z - src.z;
 		
@@ -493,7 +564,7 @@ void DistanceDrivenTomo::BackprojectionTomo(float* pcuImg, const float* pcuPrj, 
 			throw runtime_error("pWeightedPrjs allocation failed");
 		}
 
-		if (cudaSuccess != cudaMalloc(&pAcc, sizeof(double) * (nu+1) * (nv+1) * nview))
+		if (cudaSuccess != cudaMalloc(&pAcc, sizeof(double) * (nu + 1) * (nv + 1) * nview))
 		{
 			throw runtime_error("pAcc allocation failed");
 		}
@@ -521,8 +592,16 @@ void DistanceDrivenTomo::BackprojectionTomo(float* pcuImg, const float* pcuPrj, 
 		cudaMemcpy(pWeightedPrjs, pcuPrj, sizeof(float) * nBatches * nu * nv * nview, cudaMemcpyDeviceToDevice);
 		for (int ib = 0; ib < nBatches; ib++)
 		{
-			PreweightBPCartKernelXY<<<blockUV, threadUV>>>(pWeightedPrjs + ib * nu * nv * nview, cuIviews,
-					nview, nview, (const float3*)pcuDetCenter, (const float3*)pcuSrc, grid.dz, det);
+			PreweightBPCartKernelXY<<<blockUV, threadUV>>>(
+				pWeightedPrjs + ib * nu * nv * nview,
+				cuIviews,
+				nview,
+				nview,
+				(const float3*)pcuDetCenter,
+				(const float3*)pcuSrc,
+				grid.dz,
+				det
+			);
 		}
 		cudaDeviceSynchronize();
 
@@ -543,9 +622,17 @@ void DistanceDrivenTomo::BackprojectionTomo(float* pcuImg, const float* pcuPrj, 
 			cudaDeviceSynchronize();
 
 			// step 2: interpolation
-			DDBPConeCartKernelXY<<<blockImg, threadImg>>>(pcuImg + ib * nx * ny * nz,
-					pAcc, cuIviews, nview, nview,
-					(const float3*)pcuDetCenter, (const float3*)pcuSrc, grid, det);
+			DDBPConeCartKernelXY<<<blockImg, threadImg>>>(
+				pcuImg + ib * nx * ny * nz,
+				pAcc,
+				cuIviews,
+				nview,
+				nview,
+				(const float3*)pcuDetCenter,
+				(const float3*)pcuSrc,
+				grid,
+				det
+			);
 			cudaDeviceSynchronize();
 		}
 
@@ -557,7 +644,8 @@ void DistanceDrivenTomo::BackprojectionTomo(float* pcuImg, const float* pcuPrj, 
 		if (cuIviews != NULL) cudaFree(cuIviews);
 
 		ostringstream oss;
-		oss << "DistanceDrivenTomo::BackprojectionTomo Error: " << e.what() << " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "DistanceDrivenTomo::BackprojectionTomo Error: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 		throw oss.str().c_str();
 	}
@@ -568,11 +656,29 @@ void DistanceDrivenTomo::BackprojectionTomo(float* pcuImg, const float* pcuPrj, 
 }
 
 // C interface
-extern "C" int cDistanceDrivenTomoBackprojection(float* img, const float* prj,
-		const float* detCenter, const float* src,
-		size_t nBatches,
-		size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-		size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
+extern "C" int cDistanceDrivenTomoBackprojection(
+	float* img,
+	const float* prj,
+	const float* detCenter,
+	const float* src,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v
+)
 {
 	float* pcuPrj = NULL;
 	float* pcuImg = NULL;
@@ -604,8 +710,10 @@ extern "C" int cDistanceDrivenTomoBackprojection(float* img, const float* prj,
 		cudaMemcpy(pcuPrj, prj, sizeof(float) * nu * nv * nview * nBatches, cudaMemcpyHostToDevice);
 
 		DistanceDrivenTomo projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0
+		);
 
 		projector.BackprojectionTomo(pcuImg, pcuPrj, pcuDetCenter, pcuSrc);
 		cudaMemcpy(img, pcuImg, sizeof(float) * nx * ny * nz * nBatches, cudaMemcpyDeviceToHost);
@@ -615,7 +723,7 @@ extern "C" int cDistanceDrivenTomoBackprojection(float* img, const float* prj,
 	{
 		ostringstream oss;
 		oss << "cDistanceDrivenTomoProjection() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 
@@ -628,17 +736,37 @@ extern "C" int cDistanceDrivenTomoBackprojection(float* img, const float* prj,
 
 }
 
-extern "C" int cupyDistanceDrivenTomoBackprojection(float* img, const float* prj,
-	const float* detCenter, const float* src,
+extern "C" int cupyDistanceDrivenTomoBackprojection(
+	float* img,
+	const float* prj,
+	const float* detCenter,
+	const float* src,
 	size_t nBatches,
-	size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz,
-	size_t nu, size_t nv, size_t nview, float du, float dv, float off_u, float off_v)
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float du,
+	float dv,
+	float off_u,
+	float off_v
+)
 {
 	try
 	{
 		DistanceDrivenTomo projector;
-		projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-				nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0);
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, du, dv, off_u, off_v, 0, 0, 0
+		);
 
 		projector.BackprojectionTomo(img, prj, detCenter, src);
 
@@ -647,12 +775,10 @@ extern "C" int cupyDistanceDrivenTomoBackprojection(float* img, const float* prj
 	{
 		ostringstream oss;
 		oss << "cDistanceDrivenTomoProjection() failed: " << e.what()
-				<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 
 	return cudaGetLastError();
 
 }
-
-

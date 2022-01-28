@@ -11,8 +11,15 @@
 
 using namespace std;
 
-void GetRamp(cufftComplex* pcuFreqKernel, size_t nu, size_t nview, float da, int filterType, cudaStream_t& stream,
-    bool isEqualSpace = false)
+void GetRamp(
+    cufftComplex* pcuFreqKernel,
+    size_t nu,
+    size_t nview,
+    float da,
+    int filterType,
+    cudaStream_t& stream,
+    bool isEqualSpace = false
+)
 {
     int filterLen = 2 * nu - 1;
 
@@ -170,7 +177,7 @@ void GetRamp(cufftComplex* pcuFreqKernel, size_t nu, size_t nview, float da, int
 
         ostringstream oss;
         oss << "GetRamp() failed: " << e.what()
-                << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
         cerr << oss.str() << endl;
         throw runtime_error(oss.str().c_str());
     }
@@ -281,13 +288,14 @@ void fbpFan::Filter(float* pcuFPrj, const float* pcuPrj)
             for (int iv = 0; iv < nv; iv++)
             {
                 cudaMemsetAsync(pcuPrjPad, 0, sizeof(float) * filterLen * nview, m_stream);
-                CopyPrjToPad<<<blocks, threads, 0, m_stream>>>(pcuPrjPad,
-                        pcuPrj + ib * nu * nv * nview,
-                        iv, nu, filterLen, nv, nview);
+                CopyPrjToPad<<<blocks, threads, 0, m_stream>>>(
+                    pcuPrjPad, pcuPrj + ib * nu * nv * nview, iv, nu, filterLen, nv, nview
+                );
 
                 // pre weighting
-                Multiply2D<<<blocks, threads, 0, m_stream>>>(pcuPrjPad, pcuPrjPad, pcuw,
-                        nu, nview, filterLen, filterLen, nu);
+                Multiply2D<<<blocks, threads, 0, m_stream>>>(
+                    pcuPrjPad, pcuPrjPad, pcuw, nu, nview, filterLen, filterLen, nu
+                );
                 cudaDeviceSynchronize();
 
                 cufftExecR2C(plan, pcuPrjPad, pcuFreqPrj);
@@ -296,12 +304,13 @@ void fbpFan::Filter(float* pcuFPrj, const float* pcuPrj)
                 cufftExecC2R(planInverse, pcuFreqPrj, pcuPrjPad);
 
                 // post scaling
-                Scale2D<<<blocks, threads, 0, m_stream>>>(pcuPrjPad + nu - 1, pcuPrjPad + nu - 1,
-                        scale, nu, nview, filterLen, filterLen);
+                Scale2D<<<blocks, threads, 0, m_stream>>>(
+                    pcuPrjPad + nu - 1, pcuPrjPad + nu - 1, scale, nu, nview, filterLen, filterLen
+                );
 
-                CopyPadToPrj<<<blocks, threads, 0, m_stream>>>(pcuPrjPad + nu - 1,
-                        pcuFPrj + ib * nu * nv * nview,
-                        iv, nu, filterLen, nv, nview);
+                CopyPadToPrj<<<blocks, threads, 0, m_stream>>>(
+                    pcuPrjPad + nu - 1, pcuFPrj + ib * nu * nv * nview, iv, nu, filterLen, nv, nview
+                );
             }
         }
     }
@@ -317,7 +326,7 @@ void fbpFan::Filter(float* pcuFPrj, const float* pcuPrj)
 
         ostringstream oss;
         oss << "fbpFan::Filter() failed: " << e.what()
-                << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
         cerr << oss.str() << endl;
         throw runtime_error(oss.str().c_str());
     }
@@ -332,14 +341,27 @@ void fbpFan::Filter(float* pcuFPrj, const float* pcuPrj)
 
 }
 
-extern "C" int cfbpFanFilter(float* pFPrj, const float* pPrj,
+extern "C" int cfbpFanFilter(
+    float* pFPrj,
+    const float* pPrj,
     int nBatches, 
-    size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
-    float dsd, float dso, int typeFilter = 0)
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float da,
+    float dv,
+    float off_a,
+    float off_v,
+    float dsd,
+    float dso,
+    int typeFilter = 0
+)
 {
     fbpFan filter;
-    filter.Setup(nBatches, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-        nu, nv, nview, da, dv, off_a, off_v, dsd, dso, typeFilter);
+    filter.Setup(
+        nBatches, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+        nu, nv, nview, da, dv, off_a, off_v, dsd, dso, typeFilter
+    );
     float* pcuFPrj = NULL;
     float* pcuPrj = NULL;
 
@@ -364,7 +386,7 @@ extern "C" int cfbpFanFilter(float* pFPrj, const float* pPrj,
     {
         ostringstream oss;
         oss << "cFilterFanFilter() failed: " << e.what()
-                << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
         cerr << oss.str() << endl;
     }
 
@@ -380,8 +402,17 @@ Backprojection
 **************************/
 
 const static int nzBatch = 5;
-__global__ void bpFanKernel3D(float* pImg, const float* prj, const float* pDeg,
-    size_t nview, const Grid grid, const Detector det, float dsd, float dso, bool isFBP)
+__global__ void bpFanKernel3D(
+    float* pImg,
+    const float* prj,
+    const float* pDeg,
+    size_t nview,
+    const Grid grid,
+    const Detector det,
+    float dsd,
+    float dso,
+    bool isFBP
+)
 {
 	int ix = blockIdx.x * blockDim.x + threadIdx.x;
 	int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -402,12 +433,12 @@ __global__ void bpFanKernel3D(float* pImg, const float* prj, const float* pDeg,
 	{
 		cosDeg = __cosf(pDeg[iview]);
 		sinDeg = __sinf(pDeg[iview]);
-		rx =  pt.x*cosDeg + pt.y*sinDeg;
-		ry = -pt.x*sinDeg + pt.y*cosDeg;
+		rx =  pt.x * cosDeg + pt.y * sinDeg;
+		ry = -pt.x * sinDeg + pt.y * cosDeg;
 		a = atanf(rx/(ry+dso));
 		if (isFBP)
 		{
-			dist = dso*dso / (rx*rx + (dso+ry)*(dso+ry));
+			dist = dso*dso / (rx * rx + (dso + ry) * (dso + ry));
 		}
 		else
 		{
@@ -422,7 +453,7 @@ __global__ void bpFanKernel3D(float* pImg, const float* prj, const float* pDeg,
 			}
 		}
 
-		pu = -(a/det.du + det.off_u) + (det.nu - 1.0f) / 2.0f;
+		pu = -(a / det.du + det.off_u) + (det.nu - 1.0f) / 2.0f;
 
 #pragma unroll
 		for (int iz = 0; iz < nzBatch; iz++)
@@ -457,20 +488,44 @@ void fbpFan::Backprojection(float* pcuImg, const float* pcuPrj, const float* pcu
             nview,
             MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz),
             MakeDetector(nu, nv, du, dv, off_u, off_v),
-            dsd, dso, true);
+            dsd,
+            dso,
+            true
+        );
         cudaDeviceSynchronize();
 	}
 }
 
-extern "C" int cfbpFanBackprojection(float* pImg, const float* pPrj, const float* pDeg,
+extern "C" int cfbpFanBackprojection(
+    float* pImg,
+    const float* pPrj,
+    const float* pDeg,
     size_t nBatches, 
-    size_t nx, size_t ny, size_t nz, float dx, float dy, float dz, float cx, float cy, float cz, 
-    size_t nu, size_t nv, size_t nview, float da, float dv, float off_a, float off_v,
-    float dsd, float dso)
+    size_t nx,
+    size_t ny,
+    size_t nz,
+    float dx,
+    float dy,
+    float dz,
+    float cx,
+    float cy,
+    float cz,
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float da,
+    float dv,
+    float off_a,
+    float off_v,
+    float dsd,
+    float dso
+)
 {
     fbpFan projector;
-    projector.Setup(nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
-            nu, nv, nview, da, dv, off_a, off_v, dsd, dso);
+    projector.Setup(
+        nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+        nu, nv, nview, da, dv, off_a, off_v, dsd, dso
+    );
 
     float* pcuImg = NULL;
     float* pcuPrj = NULL;
@@ -504,7 +559,7 @@ extern "C" int cfbpFanBackprojection(float* pImg, const float* pPrj, const float
     {
         ostringstream oss;
         oss << "cfbpFanBackprojection() failed: " << e.what()
-                << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
         cerr << oss.str() << endl;
     }
 

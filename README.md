@@ -1,5 +1,29 @@
+# CT Projection and Reconstruction Package
+
 ## Projector for CT
-Change the gpu-architecture in makefile under */cuda to target for different GPUs.
+The makefile were written to target the following GPU configurations (-gencode):
+
+- arch=compute_60,code=sm_60: P100, etc.
+- arch=compute_61,code=sm_61: GTX 1080 etc.
+- arch=compute_70,code=sm_70: V100 etc.
+- arch=compute_75,code=sm_75: RTX2080 etc.
+
+Change the `GPU_CODE_FLAG` in the makefile under projector/cuda and prior/cuda to change the above options.
+
+### Build CUDA binary (Linux only)
+- Projectors
+```
+cd projector
+make cuda  # build cuda only
+make all  # build both cuda and tensorflow
+make clean  # clean make output
+```
+- Prior and denoiser
+```
+cd prior/cuda
+make  # build everything
+make clean  # clean make output
+```
 
 ### Image axis
 The images are assumed to have dimension (batch, nz, ny, nx), where batch is the highest dimension;
