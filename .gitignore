@@ -1,4 +1,5 @@
 /legacy
+
 output
 .ipynb_checkpoints
 __pycache__
@@ -6,6 +7,5 @@ __pycache__
 *.npy
 *.o
 *.mat
-.vscode
 *.egg-info
 dist
