@@ -1,8 +1,8 @@
 # CT Projection and Reconstruction Package
 
 ## Installation
-`pip install git+https://github.com/wudufan/CTProjector.git`
-`pip install git+https://github.com/wudufan/CTProjector.git --no-dependencies`
+- `pip install git+https://github.com/wudufan/CTProjector.git`
+- `pip install git+https://github.com/wudufan/CTProjector.git --no-dependencies`
 
 The second option is more useful when you are using conda to manage the environment. 
 
