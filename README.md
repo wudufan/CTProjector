@@ -1,7 +1,20 @@
 # CT Projection and Reconstruction Package
 
-## installation
+## Installation
+`pip install git+https://github.com/wudufan/CTProjector.git`
+`pip install git+https://github.com/wudufan/CTProjector.git --no-dependencies`
 
+The second option is more useful when you are using conda to manage the environment. 
+
+### CUDA Version
+The kernels were built with cudatoolkit 10.1.243. It should be compatible with newer version of CUDA runtime. In case it needs to be rebuilt, refer to [Build Kernel from Source](#build-kernel-from-source).
+
+### Tensorflow Support
+Tensorflow is needed only if you need the tensorflow part of the package to be functioning. Without Tensorflow, the rest part (cupy and numpy) will still be working. Because Tensorflow integration is not so frequently required, it is not included in the setup requirement.
+
+The pre-built so files were built with tensorflow-gpu 2.4.1, it should support later version tensorflows but not likely earlier versions. 
+
+In case you need the package to be integrated to a lower version Tensorflow, you can build it from the source, see [Build Kernel from Source](#build-kernel-from-source).
 
 ## Projector for CT
 The makefile were written to target the following GPU configurations (-gencode):
@@ -13,20 +26,13 @@ The makefile were written to target the following GPU configurations (-gencode):
 
 Change the `GPU_CODE_FLAG` in the makefile under projector/cuda and prior/cuda to change the above options.
 
-### Build CUDA binary (Linux only)
-- Projectors
-```
-cd projector
-make cuda  # build cuda only
-make all  # build both cuda and tensorflow
-make clean  # clean make output
-```
-- Prior and denoiser
-```
-cd prior/cuda
-make  # build everything
-make clean  # clean make output
-```
+### Build Kernel from Source
+You can rebuild the kernels from directory `src/ct_projector/kernel`, in case there is compatibility issue 
+
+- `make cuda` will build the CUDA-only version of the package
+- `make all` will build both CUDA and Tensorflow version of the package.
+
+After rebuilding, from the package root directory, run `pip install . [--no-dependencies]` to install the package.
 
 ### Image axis
 The images are assumed to have dimension (batch, nz, ny, nx), where batch is the highest dimension;
