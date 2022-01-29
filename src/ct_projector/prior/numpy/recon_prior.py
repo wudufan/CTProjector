@@ -5,10 +5,13 @@ Numpy Wrapper of the prior functions.
 from typing import Tuple
 import numpy as np
 from ctypes import cdll, c_int, POINTER, c_float, c_ulong
-import os
 from scipy.ndimage.filters import gaussian_filter
 
-module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprior.so'))
+import pkg_resources
+
+module = cdll.LoadLibrary(
+    pkg_resources.resource_filename('ct_projector', 'kernel/bin/libprior.so')
+)
 
 
 def set_device(device: int) -> int:

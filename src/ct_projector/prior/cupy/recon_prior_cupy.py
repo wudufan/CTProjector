@@ -6,10 +6,13 @@ import numpy as np
 import cupy as cp
 from ctypes import cdll, c_int, c_void_p, c_float, c_ulong
 from typing import Tuple
-import os
 from scipy.ndimage.filters import gaussian_filter
 
-module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprior.so'))
+import pkg_resources
+
+module = cdll.LoadLibrary(
+    pkg_resources.resource_filename('ct_projector', 'kernel/bin/libprior.so')
+)
 
 
 def nlm(

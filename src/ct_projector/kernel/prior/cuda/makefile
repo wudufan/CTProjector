@@ -1,5 +1,15 @@
-# gpu code generation
-# The default here are: P100, GTX 1080 and similar, V100, RTX2080 and similar
+# objects = NonLocalMean.o TotalVariation.o
+# OUT = output
+
+# all: $(objects)
+# 	cd ${OUT}; \
+# 	nvcc -v --shared $(objects) --gpu-architecture=sm_70 -o libprior.so
+
+# %.o: %.cu
+# 	nvcc -O3 -v --gpu-architecture=sm_70 --compiler-options '-fPIC' -I.. -dc $< -o ${OUT}/$@
+
+# $(shell mkdir -p $(OUT))
+
 GPU_CODE_FLAG= \
 -gencode=arch=compute_60,code=sm_60 \
 -gencode=arch=compute_61,code=sm_61 \
@@ -7,8 +17,8 @@ GPU_CODE_FLAG= \
 -gencode=arch=compute_75,code=sm_75
 
 OUT = ./output
-DST = ..
-TARGET = libprojector
+DST = ../../bin
+TARGET = libprior
 GPUCODE_TARGET = ${OUT}/${TARGET}.gpu.o
 SHARED_TARGET = ${OUT}/${TARGET}.so
 STATIC_TARGET = ${OUT}/${TARGET}.a
@@ -17,7 +27,7 @@ SOURCES := $(wildcard *.cu)
 OBJECTS := $(addprefix ${OUT}/,$(patsubst %.cu,%.o,$(SOURCES)))
 DEPENDS := $(addprefix ${OUT}/,$(patsubst %.cu,%.d,$(SOURCES)))
 
-.PHONY: all shared static clean
+.PHONY: all shared clean
 
 all: shared static
 
@@ -27,7 +37,7 @@ static: ${STATIC_TARGET}
 
 # shared library for python
 ${SHARED_TARGET}: ${OBJECTS}
-	nvcc --shared $(OBJECTS) ${GPU_CODE_FLAG} -lcufft -o ${SHARED_TARGET}
+	nvcc --shared $(OBJECTS) ${GPU_CODE_FLAG} -o ${SHARED_TARGET}
 	cp ${SHARED_TARGET} ${DST}/${TARGET}.so
 
 # static library for tensorflow
@@ -47,3 +57,4 @@ clean:
 	-rm -f ${OBJECTS} ${STATIC_TARGET} ${SHARED_TARGET} ${GPUCODE_TARGET} ${DEPENDS}
 
 $(shell mkdir -p $(OUT))
+$(shell mkdir -p $(DST))

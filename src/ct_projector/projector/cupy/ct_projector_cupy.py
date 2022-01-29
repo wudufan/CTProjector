@@ -6,12 +6,15 @@ between CPU and GPU but costs more GPU memory.
 from ctypes import cdll, c_int, c_void_p, c_ulong, c_float
 from typing import Callable, Union
 
-import os
 import cupy as cp
 import numpy as np
 import configparser
 
-module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprojector.so'))
+import pkg_resources
+
+module = cdll.LoadLibrary(
+    pkg_resources.resource_filename('ct_projector', 'kernel/bin/libprojector.so')
+)
 
 
 class ct_projector:

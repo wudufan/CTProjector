@@ -6,3 +6,6 @@ __pycache__
 *.npy
 *.o
 *.mat
+.vscode
+*.egg-info
+dist

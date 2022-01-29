@@ -7,11 +7,14 @@ It has the same interface with the cupy version but some are not implemented.
 from ctypes import cdll, POINTER, c_float, c_int, c_ulong
 from typing import Callable
 
-import os
 import numpy as np
 import configparser
 
-module = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), 'libprojector.so'))
+import pkg_resources
+
+module = cdll.LoadLibrary(
+    pkg_resources.resource_filename('ct_projector', 'kernel/bin/libprojector.so')
+)
 
 
 class ct_projector:

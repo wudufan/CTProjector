@@ -7,8 +7,8 @@ Change all the cupy to numpy should be able to change it to numpy version.
 from typing import Union, Tuple, Callable, Any
 
 import cupy as cp
-import prior.recon_prior_cupy as recon_prior
-from projector.ct_projector_cupy import ct_projector
+import ct_projector.prior.cupy as recon_prior
+from ct_projector.projector.cupy import ct_projector
 
 
 def sqs_gaussian_one_step(

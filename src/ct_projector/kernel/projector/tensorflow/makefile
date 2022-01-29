@@ -1,5 +1,5 @@
 OUT = ./output
-DST = ..
+DST = ../../bin
 TARGET = libtfprojector
 
 SHARED_TARGET = ${OUT}/${TARGET}.so
@@ -23,7 +23,7 @@ shared: ${SHARED_TARGET}
 # shared library
 ${SHARED_TARGET}: ${OBJECTS}
 	nvcc $(OBJECTS) -shared ${LFLAGS} ${TF_LFLAGS} -o ${SHARED_TARGET}
-	cp ${SHARED_TARGET} ../${TARGET}.so
+	cp ${SHARED_TARGET} ${DST}/${TARGET}.so
 
 # dependency
 -include $(DEPENDS)
@@ -37,3 +37,4 @@ clean:
 	-rm -f ${OBJECTS} ${SHARED_TARGET} ${DEPENDS}
 
 $(shell mkdir -p $(OUT))
+$(shell mkdir -p $(DST))

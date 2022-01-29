@@ -2,13 +2,16 @@
 Wrapper for Tensorflow.
 '''
 
-import os
 from typing import List, Tuple, Any
 import numpy as np
 import configparser
 import tensorflow as tf
 
-module = tf.load_op_library(os.path.join(os.path.dirname(__file__), 'libtfprojector.so'))
+import pkg_resources
+
+module = tf.load_op_library(
+    pkg_resources.resource_filename('ct_projector', 'kernel/bin/libtfprojector.so')
+)
 
 
 def tile_tensor(tensor, batchsize):
