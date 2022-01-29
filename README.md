@@ -1,5 +1,8 @@
 # CT Projection and Reconstruction Package
 
+## installation
+
+
 ## Projector for CT
 The makefile were written to target the following GPU configurations (-gencode):
 
