@@ -6,6 +6,28 @@
 
 The second option is more useful when you are using conda to manage the environment. 
 
+## Usage
+The package has the following python modules:
+
+### projectors
+```python
+import ct_projector.projector.cupy  # cupy
+import ct_projector.projector.numpy  # numpy
+import ct_projector.projector.tensorflow  # Tensorflow
+```
+
+### priors/denoisers
+```python
+import ct_projector.prior.cupy  # cupy
+import ct_projector.prior.numpy  # numpy
+```
+
+### reconstruction algorithms
+```python
+import ct_projector.recon.cupy   # cupy
+```
+
+## Requirements
 ### CUDA Version
 The kernels were built with cudatoolkit 10.1.243. It should be compatible with newer version of CUDA runtime. In case it needs to be rebuilt, refer to [Build Kernel from Source](#build-kernel-from-source).
 
