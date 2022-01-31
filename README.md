@@ -38,6 +38,9 @@ The pre-built so files were built with tensorflow-gpu 2.4.1, it should support l
 
 In case you need the package to be integrated to a lower version Tensorflow, you can build it from the source, see [Build Kernel from Source](#build-kernel-from-source).
 
+### Cupy
+cupy >= 8.0 is required to run the cupy modules. Without cupy, the numpy module will still work.
+
 ## Projector for CT
 The makefile were written to target the following GPU configurations (-gencode):
 
