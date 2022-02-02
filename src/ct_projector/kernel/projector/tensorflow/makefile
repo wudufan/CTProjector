@@ -12,6 +12,7 @@ LFLAGS=-L../cuda/output -l:libprojector.a -lcufft
 CFLAGS=-I../cuda
 
 TF_INCLUDE ?= $(shell python -c 'import tensorflow as tf; print(tf.sysconfig.get_include())')
+TF_CFLAGS := $(shell python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))')
 TF_LFLAGS ?= $(shell python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_link_flags()))')
 
 .PHONY: all shared clean
@@ -30,8 +31,8 @@ ${SHARED_TARGET}: ${OBJECTS}
 
 #compile
 ${OUT}/%.o: %.cpp
-	nvcc -E ${CFLAGS} -I${TF_INCLUDE} --compiler-options '-MM -MF $(patsubst %.o,%.d,$@) -MT $@ -MP' $<
-	nvcc -c -O3 ${CFLAGS} -I${TF_INCLUDE} --compiler-options "-fPIC -std=c++11 -D_GLIBCXX_USE_CXX11_ABI=1" $< -o $@
+	nvcc -E ${CFLAGS} ${TF_CFLAGS} --compiler-options '-MM -MF $(patsubst %.o,%.d,$@) -MT $@ -MP' $<
+	nvcc -c -O3 ${CFLAGS} ${TF_CFLAGS} --compiler-options "-fPIC -std=c++11" $< -o $@
 
 clean: 
 	-rm -f ${OBJECTS} ${SHARED_TARGET} ${DEPENDS}

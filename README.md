@@ -34,7 +34,9 @@ The kernels were built with cudatoolkit 10.1.243. It should be compatible with n
 ### Tensorflow Support
 Tensorflow is needed only if you need the tensorflow part of the package to be functioning. Without Tensorflow, the rest part (cupy and numpy) will still be working. Because Tensorflow integration is not so frequently required, it is not included in the setup requirement.
 
-The pre-built so files were built with tensorflow-gpu 2.4.1, it should support later version tensorflows but not likely earlier versions. 
+**The pre-built *.so files were built against anaconda/tensorflow-gpu 2.4.1, it does not work against pip installed Tensorflow.**
+
+**Please use the pip-built tags for pip installed Tensorflow. Conda tf has -D_GLIBCXX_USE_CXX11_ABI=1, but pip tf has -D_GLIBCXX_USE_CXX11_ABI=0.**
 
 In case you need the package to be integrated to a lower version Tensorflow, you can build it from the source, see [Build Kernel from Source](#build-kernel-from-source).
 
