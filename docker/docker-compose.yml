@@ -1,0 +1,28 @@
+version: '3.8'
+services:
+  compile:
+    image: ct_projector:0.1.0
+    runtime: nvidia
+    privileged: true
+    volumes:
+    - '${SOURCE_DIR}:${CONTAINER_WORKDIR}'
+    # ports:
+    # - '8111:8111' # jupyter lab to hold multiple terminals
+    # - '8112:8112' # tensorboard if needed
+    stdin_open: true
+    tty: true
+    container_name: ct_projector
+    environment:
+    - CONTAINER_UID=${HOST_USER_ID}
+    - CONTAINER_GID=${HOST_GROUP_ID}
+    - CONTAINER_UNAME=${HOST_USER_NAME}
+    - CONTAINER_WORKDIR=${CONTAINER_WORKDIR}
+    # entrypoint: ['/env/entrypoint.sh', '/env/compile.sh']
+    entrypoint: ['/env/entrypoint.sh']
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 172.10.0.1/24

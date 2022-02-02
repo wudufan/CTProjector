@@ -1,0 +1,26 @@
+# FROM nvidia/cuda:11.2.1-cudnn8-devel-ubuntu20.04
+FROM nvidia/cuda:11.0.3-cudnn8-devel-ubuntu20.04
+
+RUN apt update && apt install -y \
+        python3.8 \
+        python3-pip \
+        wget \
+        git \
+        git-lfs && \
+    apt clean
+
+RUN rm /usr/bin/python3 && \
+    ln -s /usr/bin/python3.8 /usr/bin/python3 && \
+    ln -s /usr/bin/python3.8 /usr/bin/python
+
+RUN python3 -m pip install --upgrade pip
+COPY requirements.txt /env/requirements.txt
+RUN python3 -m pip install --no-cache-dir -r /env/requirements.txt
+
+COPY entrypoint.sh /env/entrypoint.sh
+RUN chmod +x /env/entrypoint.sh
+
+COPY compile.sh /env/compile.sh
+RUN chmod +x /env/compile.sh
+
+ENTRYPOINT [ "/env/entrypoint.sh" ]
