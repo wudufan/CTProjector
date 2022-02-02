@@ -9,21 +9,6 @@
 
 using namespace std;
 
-__device__ __host__ static float3 GetDstForCone(
-	float u,
-	float v,
-	const float3& detCenter,
-	const float3& detU,
-	const float3& detV,
-	const Grid grid
-)
-{
-	return make_float3(detCenter.x + detU.x * u + detV.x * v,
-		detCenter.y + detU.y * u + detV.y * v,
-		detCenter.z + detU.z * u + detV.z * v);
-
-}
-
 __global__ void SiddonConeProjectionArbitraryKernel(
 	float* pPrj,
 	const float* pImg,
@@ -49,7 +34,7 @@ __global__ void SiddonConeProjectionArbitraryKernel(
 	float v = (iv - det.off_v - (det.nv - 1) / 2.0f) * det.dv;
 
 	float3 src = pSrc[iview];
-	float3 dst = GetDstForCone(u, v, pDetCenter[iview], pDetU[iview], pDetV[iview], grid);
+	float3 dst = UVToCart(u, v, pDetCenter[iview], pDetU[iview], pDetV[iview]);
 	MoveSourceDstNearGrid(src, dst, grid);
 
 	SiddonRayTracing(pPrj + iview * det.nu * det.nv + iv * det.nu + iu, pImg, src, dst, grid);
@@ -81,7 +66,7 @@ __global__ void SiddonConeBackprojectionArbitraryKernel(
 	float v = (iv - det.off_v - (det.nv - 1) / 2.0f) * det.dv;
 
 	float3 src = pSrc[iview];
-	float3 dst = GetDstForCone(u, v, pDetCenter[iview], pDetU[iview], pDetV[iview], grid);
+	float3 dst = UVToCart(u, v, pDetCenter[iview], pDetU[iview], pDetV[iview]);
 	MoveSourceDstNearGrid(src, dst, grid);
 
 	SiddonRayTracingTransposeAtomicAdd(pImg, pPrj[iview * det.nu * det.nv + iv * det.nu + iu], src, dst, grid);

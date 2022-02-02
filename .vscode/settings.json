@@ -14,7 +14,8 @@
         "numeric": "cpp",
         "ratio": "cpp",
         "sstream": "cpp",
-        "streambuf": "cpp"
+        "streambuf": "cpp",
+        "stdexcept": "cpp"
     },
     "python.linting.flake8Enabled": true,
     "python.linting.enabled": true

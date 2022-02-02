@@ -100,6 +100,23 @@ inline __device__ __host__ float3 vecNormalize(float3 v)
 	}
 }
 
+// Convert the detector position (UV) to Cartisian coordinate
+inline __device__ __host__ static float3 UVToCart(
+	float u,
+	float v,
+	const float3& detCenter,
+	const float3& detU,
+	const float3& detV
+)
+{
+	return make_float3(
+		detCenter.x + detU.x * u + detV.x * v,
+		detCenter.y + detU.y * u + detV.y * v,
+		detCenter.z + detU.z * u + detV.z * v
+	);
+
+}
+
 void GetThreadsForXZ(dim3 &threads, dim3 &blocks, int nx, int ny, int nz);
 
 void GetThreadsForXY(dim3 &threads, dim3 &blocks, int nx, int ny, int nz);
@@ -109,3 +126,8 @@ __device__ double InterpolateXY(const double* buff, float x, float y, int iz, si
 __device__ float InterpolateXY(const float* buff, float x, float y, int iz, size_t nx, size_t ny, size_t nz, bool truncate = false);
 __device__ float InterpolateXZ(const float* buff, float x, int iy, float z, size_t nx, size_t ny, size_t nz, bool truncate = false);
 __device__ float InterpolateYZ(const float* buff, int ix, float y, float z, size_t nx, size_t ny, size_t nz, bool truncate = false);
+
+// 2d integration inside a box
+__device__ float IntegralBoxXY(
+	const float* buff, float x1, float y1, float x2, float y2, int iz, size_t nx, size_t ny, size_t nz
+);

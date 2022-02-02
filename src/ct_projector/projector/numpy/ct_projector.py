@@ -101,31 +101,29 @@ class ct_projector:
         self.backprojector = backprojector
         self.bp_kwargs = kwargs
 
-    def fp(self, img: np.array) -> np.array:
-        '''
-        Generic forward projection function.
-        '''
-        return self.projector(img, **(self.fp_kwargs))
-
-    def bp(self, prj: np.array) -> np.array:
-        '''
-        Generic backprojection function.
-        '''
-        return self.backprojector(prj, **(self.bp_kwargs))
-
-    def fp2(self, img: np.array, **kwargs) -> np.array:
+    def fp(self, img: np.array, **kwargs) -> np.array:
         '''
         Generic forward projection function, the **kwargs will override
         the default params set by self.set_projector.
+
+        Only need to set the parameters that is different from the default one.
         '''
+        for k in self.fp_kwargs:
+            if k not in kwargs:
+                kwargs[k] = self.fp_kwargs[k]
         return self.projector(img, **kwargs)
 
-    def bp2(self, img: np.array, **kwargs) -> np.array:
+    def bp(self, prj: np.array, **kwargs) -> np.array:
         '''
         Generic backprojection function, the **kwargs will override
         the default params set by self.set_backprojector.
+
+        Only need to set the parameters that is different from the default one.
         '''
-        return self.backprojector(img, **kwargs)
+        for k in self.bp_kwargs:
+            if k not in kwargs:
+                kwargs[k] = self.bp_kwargs[k]
+        return self.backprojector(prj, **kwargs)
 
     def calc_projector_norm(self, weight: np.array = None, niter: int = 10) -> float:
         '''
@@ -561,7 +559,13 @@ class ct_projector:
 
         return img
 
-    def distance_driven_fp_tomo(self, img: np.array, det_center: np.array, src: np.array) -> np.array:
+    def distance_driven_fp_tomo(
+        self,
+        img: np.array,
+        det_center: np.array,
+        src: np.array,
+        branchless: bool = False
+    ) -> np.array:
         '''
         Distance driven forward projection for tomosynthesis. It assumes that the detector has
         u=(1,0,0) and v = (0,1,0).
@@ -578,6 +582,8 @@ class ct_projector:
             The center of the detector in mm. Each row records the center of detector as (z, y, x).
         src: np.array(float32) of size [nview, 3].
             The src positions in mm. Each row records in the source position as (z, y, x).
+        branchless: bool
+            If True, use the branchless mode (double precision required).
 
         Returns
         -------------------------
@@ -589,6 +595,11 @@ class ct_projector:
         src = src.astype(np.float32)
 
         prj = np.zeros([img.shape[0], det_center.shape[0], self.nv, self.nu], np.float32)
+
+        if branchless:
+            type_projector = 1
+        else:
+            type_projector = 0
 
         module.cDistanceDrivenTomoProjection.restype = c_int
         err = module.cDistanceDrivenTomoProjection(
@@ -612,7 +623,8 @@ class ct_projector:
             c_float(self.du),
             c_float(self.dv),
             c_float(self.off_u),
-            c_float(self.off_v)
+            c_float(self.off_v),
+            c_int(type_projector)
         )
 
         if err != 0:
@@ -620,7 +632,13 @@ class ct_projector:
 
         return prj
 
-    def distance_driven_bp_tomo(self, prj: np.array, det_center: np.array, src: np.array) -> np.array:
+    def distance_driven_bp_tomo(
+        self,
+        prj: np.array,
+        det_center: np.array,
+        src: np.array,
+        branchless: bool = False
+    ) -> np.array:
         '''
         Distance driven backprojection for tomosynthesis. It assumes that the detector has
         u=(1,0,0) and v = (0,1,0).
@@ -637,6 +655,8 @@ class ct_projector:
             The center of the detector in mm. Each row records the center of detector as (z, y, x).
         src: np.array(float32) of size [nview, 3].
             The src positions in mm. Each row records in the source position as (z, y, x).
+        branchless: bool
+            If True, use the branchless mode (double precision required).
 
         Returns
         -------------------------
@@ -649,6 +669,11 @@ class ct_projector:
         src = src.astype(np.float32)
 
         img = np.zeros([prj.shape[0], self.nz, self.ny, self.nx], np.float32)
+
+        if branchless:
+            type_projector = 1
+        else:
+            type_projector = 0
 
         module.cDistanceDrivenTomoBackprojection.restype = c_int
         err = module.cDistanceDrivenTomoBackprojection(
@@ -672,7 +697,8 @@ class ct_projector:
             c_float(self.du),
             c_float(self.dv),
             c_float(self.off_u),
-            c_float(self.off_v)
+            c_float(self.off_v),
+            c_int(type_projector)
         )
 
         if err != 0:
