@@ -1,12 +1,12 @@
 '''
-Numpy wrapper among the cuda projectors. It is slower than the cupy version but
-costs less GPU memory.
-It has the same interface with the cupy version but some are not implemented.
+Cupy-based wrapper of the CUDA functions. Compared to numpy wrapper, it reduces memory transfer
+between CPU and GPU but costs more GPU memory.
 '''
 
 from ctypes import cdll, c_int
 from typing import Callable
 
+import cupy as cp
 import numpy as np
 import configparser
 
@@ -68,7 +68,7 @@ class ct_projector:
         self.ny = int(self.ny)
         self.nz = int(self.nz)
 
-    def set_projector(self, projector: Callable[..., np.array], **kwargs) -> None:
+    def set_projector(self, projector: Callable[..., cp.array], **kwargs) -> None:
         '''
         Set the projector. After the projector is set, one can call ct_projector.fp()
         to use the projector. This will enable same reconstruction algorithm with different projectors.
@@ -80,7 +80,7 @@ class ct_projector:
         projector: callback function.
             The parameters must be projector(ct_projector, img, **kwargs). The first parameter is
             a ct_projector class, the second parameter is the image.
-            The return value should be the forward projections in np.array.
+            The return value should be the forward projections in cp.array.
         **kwargs: parameters.
             kwargs to be parsed when calling the projector. For example, one can pass how many
             angles are there for the projector.
@@ -88,7 +88,7 @@ class ct_projector:
         self.projector = projector
         self.fp_kwargs = kwargs
 
-    def set_backprojector(self, backprojector: Callable[..., np.array], **kwargs) -> None:
+    def set_backprojector(self, backprojector: Callable[..., cp.array], **kwargs) -> None:
         '''
         Set the backprojector. After the backprojector is set, one can call ct_projector.bp()
         to use the backprojector. This will enable same reconstruction algorithm with different projectors.
@@ -108,7 +108,7 @@ class ct_projector:
         self.backprojector = backprojector
         self.bp_kwargs = kwargs
 
-    def fp(self, img: np.array, **kwargs) -> np.array:
+    def fp(self, img: cp.array, **kwargs) -> cp.array:
         '''
         Generic forward projection function, the **kwargs will override
         the default params set by self.set_projector.
@@ -120,7 +120,7 @@ class ct_projector:
                 kwargs[k] = self.fp_kwargs[k]
         return self.projector(self, img, **kwargs)
 
-    def bp(self, prj: np.array, **kwargs) -> np.array:
+    def bp(self, prj: cp.array, **kwargs) -> cp.array:
         '''
         Generic backprojection function, the **kwargs will override
         the default params set by self.set_backprojector.
@@ -132,7 +132,7 @@ class ct_projector:
                 kwargs[k] = self.bp_kwargs[k]
         return self.backprojector(self, prj, **kwargs)
 
-    def calc_projector_norm(self, weight: np.array = None, niter: int = 10) -> float:
+    def calc_projector_norm(self, weight: cp.array = None, niter: int = 10) -> float:
         '''
         Use power method to calculate the norm of the projector.
 
@@ -149,25 +149,25 @@ class ct_projector:
             The norm of the projector A, or sqrt(w)A with weighting matrix.
         '''
         if weight is not None:
-            weight = np.sqrt(weight)
+            weight = cp.sqrt(weight)
         else:
             weight = 1
 
-        x = np.random.uniform(size=[1, self.nz, self.ny, self.nx], dtype=np.float32)
-        x = x / np.linalg.norm(x)
+        x = cp.random.uniform(size=[1, self.nz, self.ny, self.nx], dtype=cp.float32)
+        x = x / cp.linalg.norm(x)
 
         for i in range(niter):
             print(i, end=',', flush=True)
             fp = self.fp(x)
-            norm = np.linalg.norm(fp)
+            norm = cp.linalg.norm(fp)
             x = self.bp(fp * weight)
 
-            x = x / np.linalg.norm(x)
+            x = x / cp.linalg.norm(x)
         print('')
 
         return norm
 
-    def calc_norm_img(self, weight: np.array = None) -> np.array:
+    def calc_norm_img(self, weight: cp.array = None) -> cp.array:
         '''
         Calculate norm_img = A.T*w*A*1
 
@@ -184,7 +184,7 @@ class ct_projector:
         if weight is None:
             weight = 1
 
-        x = np.ones([1, self.nz, self.ny, self.nx], dtype=np.float32)
+        x = cp.ones([1, self.nz, self.ny, self.nx], dtype=cp.float32)
         return self.bp(self.fp(x) * weight)
 
     def get_angles(self) -> np.array:

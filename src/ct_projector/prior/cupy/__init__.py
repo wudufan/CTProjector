@@ -1,1 +1,1 @@
-from .recon_prior_cupy import nlm  # noqa
+from .recon_prior import nlm  # noqa
