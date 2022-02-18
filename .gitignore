@@ -5,6 +5,7 @@ output
 __pycache__
 *.nii.gz
 *.npy
+*.npz
 *.o
 *.mat
 *.egg-info
