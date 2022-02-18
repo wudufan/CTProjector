@@ -155,15 +155,19 @@ def rebin_to_parallel_conebeam(
     betas = np.arcsin(bs / dso)
     # the source angle for each view
     thetas = np.arange(nview_rebin) * dtheta + theta_rebin_start
+
+    # transpose the prj to nu, nview, nv for faster memory access
+    prj = np.copy(prj.transpose(2, 0, 1), 'C')
+
     # before rebin dimensions
-    nview = prj.shape[0]
-    nv = prj.shape[1]
-    nu = prj.shape[2]
+    nview = prj.shape[1]
+    nv = prj.shape[2]
+    nu = prj.shape[0]
 
     # interpolate fan angle to match the rays in the parallel beams
     print('Beta (fan angle) interpolation...')
     us = betas / da + cu
-    prj_beta_rebin = np.zeros([nview, nv, nb], np.float32)
+    prj_beta_rebin = np.zeros([nb, nview, nv], np.float32)
     for ib in range(nb):
         if (ib + 1) % 100 == 0:
             print(ib + 1, end=',', flush=True)
@@ -174,14 +178,14 @@ def rebin_to_parallel_conebeam(
         w = u - u0
 
         if u0 >= 0 and u0 < nu:
-            prj_beta_rebin[..., ib] += (1 - w) * prj[..., u0]
+            prj_beta_rebin[ib, ...] += (1 - w) * prj[u0, ...]
         if u1 >= 0 and u1 < nu:
-            prj_beta_rebin[..., ib] += w * prj[..., u1]
+            prj_beta_rebin[ib, ...] += w * prj[u1, ...]
     print('')
 
     # then interpolate theta
     print('Theta (source angle) interpolation...')
-    prj_rebin = np.zeros([len(thetas), nv, nb], np.float32)
+    prj_rebin = np.zeros([nb, len(thetas), nv], np.float32)
     for ib in range(nb):
         if (ib + 1) % 100 == 0:
             print(ib + 1, end=',')
@@ -195,11 +199,69 @@ def rebin_to_parallel_conebeam(
 
         valid_inds0 = np.where((alphas0 >= 0) & (alphas0 < nview))[0]
         alphas0 = alphas0[valid_inds0]
-        prj_rebin[valid_inds0, :, ib] += (1 - w[valid_inds0][:, np.newaxis]) * prj_beta_rebin[alphas0, :, ib]
+        prj_rebin[ib, valid_inds0, :] += (1 - w[valid_inds0][:, np.newaxis]) * prj_beta_rebin[ib, alphas0, :]
 
         valid_inds1 = np.where((alphas1 >= 0) & (alphas1 < nview))[0]
         alphas1 = alphas1[valid_inds1]
-        prj_rebin[valid_inds1, :, ib] += w[valid_inds1][:, np.newaxis] * prj_beta_rebin[alphas1, :, ib]
+        prj_rebin[ib, valid_inds1, :] += w[valid_inds1][:, np.newaxis] * prj_beta_rebin[ib, alphas1, :]
     print('')
 
+    # transpose back
+    prj_rebin = np.copy(prj_rebin.transpose((1, 2, 0)), 'C')
+
     return prj_rebin
+
+
+def rebin_helical_to_parallel(
+    projector: ct_projector,
+    prjs: np.array,
+    angles: np.array,
+    zposes: np.array
+) -> Tuple[ct_projector, np.array, np.array, float, int, int]:
+    '''
+    Rebin helical data to parallel geometry.
+
+    Parameters
+    -------------------
+    projector: ct_projector.
+        Geometry of the helical beam.
+    prjs: np.array of shape [nview, nv, nu]
+        Projection to be rebinned.
+    angles: np.array of shape [nview]
+        The source angle for each view.
+    zposes: np.array of shape [nview]
+        The z pos of source for each view.
+
+    Returns
+    --------------------
+    projector_rebin: ct_projector.
+        The rebinned geometry.
+    prjs_rebin: np.array of shape [nview_rebin, nv, nu_rebin].
+        The rebinned projection.
+    angles: np.array of shape [nview].
+        The angles unwrapped from [0, 2*pi).
+    zrot: float.
+        The source displacement in z per rotation: z = zrot * angle / (2*pi) + z0.
+    nview_margin_pre: int.
+        The offset from the first projection to the first rebinned view.
+    nview_margin_post: int.
+        The offset from the last rebinned view to the last projection.
+    '''
+    dtheta = 2 * np.pi / projector.rotview
+    angles, zrot = convert_angles_and_calculate_pitch(angles, zposes)
+    projector_rebin, nview_margin_pre, nview_margin_post = get_rebin_geometry(projector)
+    prjs_rebin = rebin_to_parallel_conebeam(
+        prjs,
+        prjs.shape[0] - nview_margin_pre - nview_margin_post,
+        projector_rebin.nu,
+        (projector_rebin.nu - 1) / 2 + projector_rebin.off_u,
+        projector_rebin.du,
+        (projector.nu - 1) / 2 + projector.off_u,
+        projector.du / projector.dsd,
+        projector.dso,
+        dtheta,
+        angles[nview_margin_pre],
+        angles[0]
+    )
+
+    return projector_rebin, prjs_rebin, angles, zrot, nview_margin_pre, nview_margin_post
