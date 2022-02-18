@@ -30,6 +30,7 @@ class ct_projector:
     '''
     def __init__(self):
         self.nview = 720
+        self.rotview = 720
         self.nu = 512
         self.nv = 512
         self.nx = 512

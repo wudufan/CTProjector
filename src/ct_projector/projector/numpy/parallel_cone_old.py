@@ -18,7 +18,7 @@ parser.add_argument('--set', dest='set', default='all')
 if 'ipykernel' in sys.argv[0]:
     args = parser.parse_args([
         '--src', '/home/local/PARTNERS/dw640/CTProjector/example/54_1.mat',
-        '--set', 'odd'
+        '--set', 'all'
     ])
 else:
     args = parser.parse_args()
