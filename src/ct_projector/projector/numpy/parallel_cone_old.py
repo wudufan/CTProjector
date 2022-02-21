@@ -326,6 +326,7 @@ theta0b = anglesB[iParaBStart - iPrjBStart + iParaBStartRel]
 z0a = posA[iParaAStart - iPrjAStart + iParaAStartFinalRel]
 z0b = posB[iParaBStart - iPrjBStart + iParaBStartRel]
 
+# %%
 np.savez(
     args.out + '_' + args.set,
     prjs=paraEx,
@@ -343,8 +344,9 @@ np.savez(
 # %%
 import matplotlib.pyplot as plt
 
-print(paraEx.shape)
+prjs_rebin_ab = paraEx[..., 0].transpose((0, 2, 3, 1))
+print(prjs_rebin_ab.shape)
 plt.figure(figsize=[16, 8])
-plt.imshow(paraEx[1, :, 2000:4000, 26, 0])
+plt.imshow(prjs_rebin_ab[0, 1000:1500, 26, :])
 
 # %%

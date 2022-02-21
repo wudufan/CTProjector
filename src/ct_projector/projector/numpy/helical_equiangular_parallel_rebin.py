@@ -265,3 +265,263 @@ def rebin_helical_to_parallel(
     )
 
     return projector_rebin, prjs_rebin, angles, zrot, nview_margin_pre, nview_margin_post
+
+
+# %%
+# For Siemens dual source CT geometry
+class PaddingParams:
+    '''
+    The parameters for dect padding.
+
+    Parameters
+    ---------------
+    first_angle_offset: int
+        The projection B acquired at angles_b[0] is corresponding to the projection A
+        acquired at angles_b[first_angle_offset].
+    istart_rebin_pad_a: int
+        Projection A start for padding relative to rebinned projection.
+    istart_rebin_pad_b: int
+        Projection B start for padding relative to rebinned projection.
+    iend_rebin_pad_a: int
+        Projection A end for padding relative to rebinned projection.
+    iend_rebin_pad_b: int
+        Projection B end for padding relative to rebinned projection.
+    iprj_offset_same: int
+        Projection offset A to B for padding along the same direction.
+    iprj_offset_opp: int
+        Projection offset A to B for padding along the opposite direction.
+    z_offset_same: float
+        Z offset A to B for padding along the same direction.
+    z_offset_opp: float
+        Z offset A to B for padding along the opposite direction.
+    '''
+    def __init__(
+        self,
+        first_angle_offset,
+        istart_rebin_pad_a,
+        istart_rebin_pad_b,
+        iend_rebin_pad_a,
+        iend_rebin_pad_b,
+        iprj_offset_same,
+        iprj_offset_opp,
+        z_offset_same,
+        z_offset_opp
+    ):
+        self.first_angle_offset = first_angle_offset
+        self.istart_rebin_pad_a = istart_rebin_pad_a
+        self.istart_rebin_pad_b = istart_rebin_pad_b
+        self.iend_rebin_pad_a = iend_rebin_pad_a
+        self.iend_rebin_pad_b = iend_rebin_pad_b
+        self.iprj_offset_same = iprj_offset_same
+        self.iprj_offset_opp = iprj_offset_opp
+        self.z_offset_same = z_offset_same
+        self.z_offset_opp = z_offset_opp
+
+
+def get_dect_padding_parameters(
+    angles_a: np.array,
+    angles_b: np.array,
+    first_angle_offset: int,
+    nview_margin_pre_a: int,
+    nview_margin_pre_b: int,
+    nview_margin_post_a: int,
+    nview_margin_post_b: int,
+    dtheta: float,
+    zrot: float,
+    rotview: int
+) -> PaddingParams:
+    '''
+    Calculate the padding related parameters for Siemens dual-source CT
+
+    Parameters
+    ----------------
+    angles_a: np.array of shape [nview_a].
+        The source angles of detector A (wider detector) in radius.
+    angles_b: np.array of shape [nview_b].
+        The source angles of detector B (narrower detector) in radius.
+    first_angle_offset: int.
+        The projection B acquired at angles_b[0] is corresponding to the projection A
+        acquired at angles_b[first_angle_offset].
+    nview_margin_pre_a: int.
+        Number of views from angles_a[0] to first angle in rebinned projection A.
+    nview_margin_pre_b: int.
+        Number of views from angles_b[0] to first angle in rebinned projection B.
+    nview_margin_post_a: int.
+        Number of views from the last angle in rebinned projection A to angles_a[-1].
+    nview_margin_post_b: int.
+        Number of views from the last angle in rebinned projection B to angles_b[-1].
+    dtheta: float.
+        The angular sampling interval.
+    zrot: float.
+        z step every rotation: z = zrot * angle / (2 * np.pi) + z0.
+    rotview: int.
+        Number of views per rotation.
+
+    Returns
+    ------------------
+    padding_params: PaddingParams
+        The paremeters for dect padding.
+    '''
+    # the angle from A to B acquired at the same time point.
+    angle_offset = angles_b[0] - angles_a[first_angle_offset]
+    # wrap between [-pi, pi)
+    angle_offset = angle_offset - int(angle_offset / np.pi) * np.pi
+    # projection A needs to shift this value for same direction padding to projection B
+    iprj_offset_same = int(angle_offset / dtheta)
+    # z_offset_same = zrot * iprj_offset_same * dtheta / (2 * np.pi)
+    z_offset_same = zrot * angle_offset / (2 * np.pi)
+
+    # projection A needs to shift this value for opposite direction padding
+    # It should go to a different direction than the same padding offset
+    if iprj_offset_same > 0:
+        iprj_offset_opp = iprj_offset_same - int(rotview / 2)
+        z_offset_opp = z_offset_same - zrot / 2
+    else:
+        iprj_offset_opp = iprj_offset_same + int(rotview / 2)
+        z_offset_opp = z_offset_same + zrot / 2
+
+    # The projection A shift needed to pad the first and last projection B
+    # They are used if projection B is needed to be truncated if there is not much margin
+    # between projection B and projection A.
+    iprj_offset_first = min(iprj_offset_same, iprj_offset_opp)
+    iprj_offset_last = max(iprj_offset_same, iprj_offset_opp)
+
+    # get the starting position
+    # Rebinned projection A and B starting position relative to angles_a[0]
+    istart_origin_rebin_a = nview_margin_pre_a
+    istart_origin_rebin_b = first_angle_offset + nview_margin_pre_b
+    # The first A projection to pad B, relative to angles_a[0]
+    istart_origin_pad_a = istart_origin_rebin_b + iprj_offset_first
+    # Calculate the A and B projections can be used for padding relative to the rebinned starting
+    if istart_origin_pad_a < istart_origin_rebin_a:
+        # if A for padding is not valid in the rebinned projections
+        # push both A and B start so A falls into the rebinned range
+        istart_rebin_pad_a = 0
+        istart_rebin_pad_b = istart_origin_rebin_a - istart_origin_pad_a
+    else:
+        istart_rebin_pad_a = istart_origin_pad_a
+        istart_rebin_pad_b = 0
+
+    # get the ending position
+    # rebinned projection A and B ending position relative to angles_a[0]
+    iend_origin_rebin_a = len(angles_a) - nview_margin_post_a
+    iend_origin_rebin_b = first_angle_offset + len(angles_b) - nview_margin_post_b
+    # The last A projection to pad B, relative to angles_a[0]
+    iend_origin_pad_a = iend_origin_rebin_b + iprj_offset_last
+    # Calculate the A and B projection endings used for padding relative to the rebinned starting
+    if iend_origin_pad_a > iend_origin_rebin_a:
+        # if A for padding is not within the rebinned range
+        # push both A and B ending so A falls into the rebinned range
+        iend_rebin_pad_a = iend_origin_rebin_a - istart_origin_rebin_a
+        iend_rebin_pad_b = iend_origin_rebin_b - (iend_origin_pad_a - iend_origin_rebin_a) - istart_origin_rebin_b
+    else:
+        iend_rebin_pad_a = iend_origin_pad_a - istart_origin_rebin_a
+        iend_rebin_pad_b = iend_origin_rebin_b - istart_origin_rebin_b
+
+    return PaddingParams(
+        first_angle_offset,
+        istart_rebin_pad_a,
+        istart_rebin_pad_b,
+        iend_rebin_pad_a,
+        iend_rebin_pad_b,
+        iprj_offset_same,
+        iprj_offset_opp,
+        z_offset_same,
+        z_offset_opp,
+    )
+
+
+def pad_dect_rebinned_prjs(
+    prj_rebin_a: np.array,
+    prj_rebin_b: np.array,
+    padding_params: PaddingParams,
+    cua: float,
+    cub: float,
+    dv: float,
+    transit_len: int = 20
+):
+    '''
+    Pad the rebinned projections from DECT
+
+    Parameters
+    -------------------
+
+    Returns
+    -------------------
+    '''
+    # transition smoothing factor
+    w = np.cos(np.pi / 2 * np.arange(transit_len) / transit_len)
+    w = w * w
+    w = w[np.newaxis, np.newaxis, :]
+
+    # the area on B to be padded with A
+    prj_rebin_b_ex = np.zeros(
+        [
+            padding_params.iend_rebin_pad_b - padding_params.istart_rebin_pad_b,
+            prj_rebin_b.shape[1],
+            prj_rebin_a.shape[2]
+        ],
+        np.float32
+    )
+
+    istart_a = padding_params.istart_rebin_pad_a + padding_params.first_angle_offset
+    istart_a_opp = istart_a + padding_params.iprj_offset_opp
+    istart_a_same = istart_a + padding_params.iprj_offset_same
+    # padding different direction
+    if padding_params.z_offset_opp < 0:
+        iv = int(-padding_params.z_offset_opp / dv)
+        prj_rebin_b_ex[:, :-iv, :] = prj_rebin_a[
+            istart_a_opp:istart_a_opp + prj_rebin_b_ex.shape[0], iv:, ::-1,
+        ]
+    else:
+        iv = int(padding_params.z_offset_opp / dv)
+        prj_rebin_b_ex[:, iv:, :] = prj_rebin_a[
+            istart_a_opp:istart_a_opp + prj_rebin_b_ex.shape[0], :-iv, ::-1,
+        ]
+
+    # padding same direction
+    if padding_params.z_offset_same < 0:
+        iv = int(-padding_params.z_offset_same / dv)
+        prj_rebin_b_ex[:, :-iv, :] = prj_rebin_a[
+            istart_a_same:istart_a_same + prj_rebin_b_ex.shape[0], iv:, :
+        ]
+    else:
+        iv = int(padding_params.z_offset_same / dv)
+        prj_rebin_b_ex[:, iv:, :] = prj_rebin_a[
+            istart_a_same:istart_a_same + prj_rebin_b_ex.shape[0], :-iv, :
+        ]
+
+    # put prj_rebin_b in the middle
+    offset = int(cua - cub)
+
+    istart_b = padding_params.istart_rebin_pad_b
+    iend_b = padding_params.iend_rebin_pad_b
+    prj_rebin_b_ex[..., offset:offset + transit_len] = \
+        prj_rebin_b[istart_b:iend_b, :, :transit_len] * (1 - w) \
+        + w * prj_rebin_b_ex[..., offset:offset + transit_len]
+
+    prj_rebin_b_ex[..., offset + prj_rebin_b.shape[2] - transit_len:offset + prj_rebin_b.shape[2]] = \
+        prj_rebin_b[istart_b:iend_b, :, -transit_len:] * w \
+        + (1 - w) * prj_rebin_b_ex[..., offset + prj_rebin_b.shape[2] - transit_len:offset + prj_rebin_b.shape[2]]
+
+    prj_rebin_b_ex[..., offset + transit_len:offset + prj_rebin_b.shape[2] - transit_len] = \
+        prj_rebin_b[istart_b:iend_b, :, transit_len:-transit_len]
+
+    # truncate to same length for projection A and padded projection B
+    prj_rebin_ab = np.array([
+        prj_rebin_a[istart_a:istart_a + prj_rebin_b_ex.shape[0], ...],
+        prj_rebin_b_ex
+    ])
+
+    return prj_rebin_ab
+
+
+def get_first_angle_ind(
+    padding_params: PaddingParams,
+    nview_margin_pre_a: int,
+    nview_margin_pre_b: int
+):
+    istart_angle_a = nview_margin_pre_a + padding_params.istart_rebin_pad_a + padding_params.first_angle_offset
+    istart_angle_b = nview_margin_pre_b + padding_params.istart_rebin_pad_b
+
+    return istart_angle_a, istart_angle_b
