@@ -138,7 +138,7 @@ extern "C" int cfbpParallelFilter(
 		{
 			throw std::runtime_error("pcuPrj allocation failed");
 		}
-		cudaMemset(pcuFPrj, 0, sizeof(float) * nBatches * nu * nv * nview * nv);
+		cudaMemset(pcuFPrj, 0, sizeof(float) * nBatches * nu * nv * nview);
 		cudaMemcpy(pcuPrj, pPrj, sizeof(float) * nBatches * nu * nv * nview, cudaMemcpyHostToDevice);
 
 		filter.Filter(pcuFPrj, pcuPrj);

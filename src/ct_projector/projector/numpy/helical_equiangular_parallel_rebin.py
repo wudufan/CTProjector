@@ -14,6 +14,7 @@ import numpy as np
 import copy
 
 from .ct_projector import ct_projector
+from .parallel import ramp_filter
 
 import pkg_resources
 
@@ -649,7 +650,7 @@ backprojection functions. The parallel filtering is from parallel.ramp_filter
 
 def fbp_bp(
     projector: ct_projector,
-    prj: np.array,
+    fprj: np.array,
     theta0: float,
     zrot: float,
     m_pi: int = 1,
@@ -679,14 +680,14 @@ def fbp_bp(
         The backprojected image.
     '''
 
-    prj = prj.astype(np.float32)
-    img = np.zeros([prj.shape[0], projector.nz, projector.ny, projector.nx], np.float32)
+    fprj = fprj.astype(np.float32)
+    img = np.zeros([fprj.shape[0], projector.nz, projector.ny, projector.nx], np.float32)
 
     module.cfbpHelicalParallelRebinBackprojection.restype = c_int
 
     err = module.cfbpHelicalParallelRebinBackprojection(
         img.ctypes.data_as(POINTER(c_float)),
-        prj.ctypes.data_as(POINTER(c_float)),
+        fprj.ctypes.data_as(POINTER(c_float)),
         c_ulong(img.shape[0]),
         c_ulong(img.shape[3]),
         c_ulong(img.shape[2]),
@@ -697,9 +698,9 @@ def fbp_bp(
         c_float(projector.cx),
         c_float(projector.cy),
         c_float(projector.cz),
-        c_ulong(prj.shape[3]),
-        c_ulong(prj.shape[2]),
-        c_ulong(prj.shape[1]),
+        c_ulong(fprj.shape[3]),
+        c_ulong(fprj.shape[2]),
+        c_ulong(fprj.shape[1]),
         c_float(projector.du),
         c_float(projector.dv),
         c_float(projector.off_u),
@@ -715,5 +716,110 @@ def fbp_bp(
 
     if err != 0:
         print(err)
+
+    return img * 2 / m_pi
+
+
+def fbp_long(
+    projector: ct_projector,
+    prj: np.array,
+    theta0: float,
+    z0: float,
+    zrot: float,
+    filter_type: str = 'hann',
+    recon_z_margin: float = 0,
+    recon_z_start: float = None,
+    recon_z_end: float = None,
+    recon_z_batch_size: int = 200,
+    m_pi: int = 1,
+    q_value: float = 0.5
+) -> np.array:
+    '''
+    Helical rebinned parallel beam backprojection, pixel driven.
+    This function will reconstruct the whole volume segments by segments to save GPU memory.
+    The sampling angles need to be evenly distributed.
+
+    Parameters
+    ----------------
+    prj: np.array(float32) of size [batch, nview, nv, nu].
+        The projection to be filtered and backprojected. The size does not need to be the same
+        with projector.nview, projector.nv, projector.nu.
+    theta0: float.
+        The starting sampling angle.
+    z0: float.
+        The z position of the first rebinned projection.
+    zrot: float.
+        Source z movement per rotation.
+    recon_z_start: float.
+        Starting z coordinate for reconstruction. If None, will use z0 + recon_z_margin.
+    recon_z_end: float.
+        Ending z coordinate for reconstruction. If None, will use max projection z - recon_z_margin.
+    recon_z_batch_size: int.
+        Number of z slices to be included in one batch reconstruction.
+    m_pi: int.
+        The BP will look within [theta - mPI * PI, theta + mPI * PI]
+    q_value: float.
+        Smoothing parameter for weighting
+
+    Returns
+    --------------
+    img: np.array(float32) of size [batch, projector.nz, projector.ny, projector.nx]
+        The backprojected image.
+    '''
+
+    if recon_z_start is None:
+        recon_z_start = z0 + recon_z_margin
+    if recon_z_end is None:
+        recon_z_end = z0 + zrot * prj.shape[1] / projector.rotview - recon_z_margin
+
+    dtheta = 2 * np.pi / projector.rotview
+    nz = int(np.ceil((recon_z_end - recon_z_start) / projector.dz))
+    assert(nz > 0)
+
+    if recon_z_batch_size > nz:
+        recon_z_batch_size = nz
+
+    img = []
+    for iz in range(0, nz, recon_z_batch_size):
+        # z size of the current batch
+        nz_batch = min(recon_z_batch_size, nz - iz)
+        # The starting and ending of the current volume in z
+        z0_batch = recon_z_start + iz * projector.dz
+        z1_batch = recon_z_start + (iz + nz_batch) * projector.dz
+
+        # The projections needed for the current batch
+        # starting projection
+        prj_z0_batch = z0_batch - (m_pi + 0.5) * zrot / 2
+        iprj_start_batch = max(int((prj_z0_batch - z0) / zrot * projector.rotview), 0)
+        theta0_batch = theta0 + iprj_start_batch * dtheta
+        # ending projection
+        prj_z1_batch = z1_batch + (m_pi + 0.5) * zrot / 2
+        iprj_end_batch = min(int(np.ceil((prj_z1_batch - z0) / zrot * projector.rotview)), prj.shape[1])
+
+        # This is the recon volume z start relative to the current projection segment
+        recon_z0_relative = z0_batch - (z0 + iprj_start_batch * zrot / projector.rotview)
+        projector_batch = copy.deepcopy(projector)
+        projector_batch.nz = nz_batch
+        projector_batch.cz = recon_z0_relative + projector_batch.nz / 2
+
+        fprj_batch = ramp_filter(
+            projector_batch,
+            np.copy(prj[:, iprj_start_batch:iprj_end_batch, :, :], 'C'),
+            filter_type
+        )
+        # Use the correct scaling factor
+        fprj_batch = fprj_batch * fprj_batch.shape[1] / projector_batch.rotview
+
+        img_batch = fbp_bp(
+            projector_batch,
+            fprj_batch,
+            theta0_batch,
+            zrot,
+            m_pi,
+            q_value
+        )
+
+        img.append(img_batch)
+    img = np.concatenate(img, 1)
 
     return img

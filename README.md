@@ -98,6 +98,8 @@ siddon_cone_fp(bp)_abitrary | Conebeam| Flat panel| Abitrary | Siddon | Yes | No
 distance_driven_fp(bp)_tomo | Conebeam| Flat panel| Tomosynthesis | Distance-driven | No | The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
 siddon_fan_fp(bp) | Fanbeam | Equiangular| Circular | Siddon | No | numpy-only
 ramp_filter/fbp_fan_bp | Fanbeam | Equiangular| Circular | FBP | No | numpy-only. Filter + pixel-driven BP
+ramp_filter | Parallel beam | Equispace | Circular | FBP | No | numpy-only.
+helical parallel rebin/BP | Conebeam | Equiangular | Helical | Rebin to parallel and FBP | No | numpy-only. Rebin + parallel.ramp_filter + BP for reconstruction. There is also padding functions to handle the Siemens dual source CT. The parallel conebeam rebinning is more accurate than single-slice rebinning and introduce less error between the A and B reconstructions.
 distance_driven_fan_fp(bp) | Fanbeam | Equiangular| Circular | Distance-driven | Yes | cupy-only
 
 ### Tensorflow Modules
