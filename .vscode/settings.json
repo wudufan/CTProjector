@@ -15,7 +15,9 @@
         "ratio": "cpp",
         "sstream": "cpp",
         "streambuf": "cpp",
-        "stdexcept": "cpp"
+        "stdexcept": "cpp",
+        "string": "cpp",
+        "exception": "cpp"
     },
     "python.linting.flake8Enabled": true,
     "python.linting.enabled": true

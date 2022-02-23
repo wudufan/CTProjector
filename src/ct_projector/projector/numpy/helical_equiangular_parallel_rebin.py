@@ -8,15 +8,22 @@ Medical physics, 35(12), pp.5882-5897.
 '''
 
 # %%
+from ctypes import cdll, POINTER, c_float, c_int, c_ulong
 from typing import Tuple
 import numpy as np
 import copy
 
 from .ct_projector import ct_projector
 
+import pkg_resources
+
+module = cdll.LoadLibrary(
+    pkg_resources.resource_filename('ct_projector', 'kernel/bin/libprojector.so')
+)
+
 
 # %%
-def convert_angles_and_calculate_pitch(
+def _convert_angles_and_calculate_pitch(
     angles: np.array, zposes: np.array
 ) -> Tuple[np.array, np.array]:
     '''
@@ -49,7 +56,7 @@ def convert_angles_and_calculate_pitch(
     return angles, zrot
 
 
-def get_rebin_geometry(
+def _get_rebin_geometry(
     projector_origin: ct_projector,
     du_rebin: float = None
 ) -> Tuple[ct_projector, int, int]:
@@ -106,7 +113,7 @@ def get_rebin_geometry(
     return projector_rebin, nview_margin_pre, nview_margin_post
 
 
-def rebin_to_parallel_conebeam(
+def _rebin_to_parallel_conebeam(
     prj: np.array,
     nview_rebin: int,
     nb: int,
@@ -248,9 +255,9 @@ def rebin_helical_to_parallel(
         The offset from the last rebinned view to the last projection.
     '''
     dtheta = 2 * np.pi / projector.rotview
-    angles, zrot = convert_angles_and_calculate_pitch(angles, zposes)
-    projector_rebin, nview_margin_pre, nview_margin_post = get_rebin_geometry(projector)
-    prjs_rebin = rebin_to_parallel_conebeam(
+    angles, zrot = _convert_angles_and_calculate_pitch(angles, zposes)
+    projector_rebin, nview_margin_pre, nview_margin_post = _get_rebin_geometry(projector)
+    prjs_rebin = _rebin_to_parallel_conebeam(
         prjs,
         prjs.shape[0] - nview_margin_pre - nview_margin_post,
         projector_rebin.nu,
@@ -318,7 +325,7 @@ class PaddingParams:
         self.z_offset_opp = z_offset_opp
 
 
-def get_dect_padding_parameters(
+def _get_dect_padding_parameters(
     angles_a: np.array,
     angles_b: np.array,
     first_angle_offset: int,
@@ -431,7 +438,7 @@ def get_dect_padding_parameters(
     )
 
 
-def pad_dect_rebinned_prjs(
+def _pad_dect_rebinned_prjs(
     prj_rebin_a: np.array,
     prj_rebin_b: np.array,
     padding_params: PaddingParams,
@@ -439,15 +446,29 @@ def pad_dect_rebinned_prjs(
     cub: float,
     dv: float,
     transit_len: int = 20
-):
+) -> np.array:
     '''
     Pad the rebinned projections from DECT
 
     Parameters
     -------------------
+    prj_rebin_a: np.array of shape [nview, nv, nu].
+        The rebinned projection A (wider detector)
+    prj_rebin_b: np.array of shape [nview, nv, nu].
+        The rebinned projection B (narrower detector)
+    padding_params: PaddingParams.
+        The padding parameters.
+    cua: float.
+        Center of rebinned detector A in pixel.
+    cub: float
+        Center of rebinned detector B in pixel.
+    transit_len: int
+        The length of smoothing area when padding projection B with A.
 
     Returns
     -------------------
+    prj_rebin_ab: np.array of shape [2, nview, nv, nu].
+        The rebinned projections A and B, with B padded to the width of A.
     '''
     # transition smoothing factor
     w = np.cos(np.pi / 2 * np.arange(transit_len) / transit_len)
@@ -516,12 +537,183 @@ def pad_dect_rebinned_prjs(
     return prj_rebin_ab
 
 
-def get_first_angle_ind(
+def _get_first_angle_ind(
     padding_params: PaddingParams,
     nview_margin_pre_a: int,
     nview_margin_pre_b: int
-):
+) -> Tuple[int, int]:
+    '''
+    Get the index for the first angle and zpos in the padded projections A and B.
+    '''
     istart_angle_a = nview_margin_pre_a + padding_params.istart_rebin_pad_a + padding_params.first_angle_offset
     istart_angle_b = nview_margin_pre_b + padding_params.istart_rebin_pad_b
 
     return istart_angle_a, istart_angle_b
+
+
+def pad_dual_source_ct_rebinned_projection(
+    projector_rebin_a: ct_projector,
+    projector_rebin_b: ct_projector,
+    prjs_rebin_a: np.array,
+    prjs_rebin_b: np.array,
+    angles_a: np.array,
+    angles_b: np.array,
+    zrot_a: float,
+    zrot_b: float,
+    first_angle_offset: int,
+    nview_margin_pre_a: int,
+    nview_margin_pre_b: int,
+    nview_margin_post_a: int,
+    nview_margin_post_b: int,
+    transit_len: int = 20
+) -> Tuple[np.array, int, int]:
+    '''
+    Pad the rebinned projection B by projection A.
+
+    Parameters
+    -------------------
+    projector_rebin_a: ct_projector
+        The geometry of rebinned projection A.
+    projector_rebin_b: ct_projector
+        The geometry of rebinned projection B.
+    prj_rebin_a: np.array of shape [nview, nv, nu].
+        The rebinned projection A (wider detector)
+    prj_rebin_b: np.array of shape [nview, nv, nu].
+        The rebinned projection B (narrower detector)
+    angles_a: np.array of shape [nview_a].
+        The source angles of detector A (wider detector) in radius.
+    angles_b: np.array of shape [nview_b].
+        The source angles of detector B (narrower detector) in radius.
+    zrot_a: float.
+        The source movement in z per rotation calculated from projection A.
+    zrot_b: float.
+        The source movement in z per rotation calculated from projection B.
+    first_angle_offset: int.
+        The projection B acquired at angles_b[0] is corresponding to the projection A
+        acquired at angles_b[first_angle_offset].
+    nview_margin_pre_a: int.
+        Number of views from angles_a[0] to first angle in rebinned projection A.
+    nview_margin_pre_b: int.
+        Number of views from angles_b[0] to first angle in rebinned projection B.
+    nview_margin_post_a: int.
+        Number of views from the last angle in rebinned projection A to angles_a[-1].
+    nview_margin_post_b: int.
+        Number of views from the last angle in rebinned projection B to angles_b[-1].
+    transit_len: int
+        The length of smoothing area when padding projection B with A.
+
+    Returns
+    -----------------
+    prj_rebin_ab: np.array of shape [2, nview, nv, nu].
+        The rebinned projections A and B, with B padded to the width of A.
+    istart_a: int.
+        The starting index in angles_a and zpos_a of the first padded projection A.
+    istart_B: int.
+        The starting index in angles_b and zpos_b of the first padded projection A.
+    '''
+    assert(projector_rebin_a.rotview == projector_rebin_b.rotview)
+
+    padding_params = _get_dect_padding_parameters(
+        angles_a,
+        angles_b,
+        first_angle_offset,
+        nview_margin_pre_a,
+        nview_margin_pre_b,
+        nview_margin_post_a,
+        nview_margin_post_b,
+        2 * np.pi / projector_rebin_a.rotview,
+        (zrot_a + zrot_b) / 2,
+        projector_rebin_a.rotview
+    )
+
+    prjs_rebin_ab = _pad_dect_rebinned_prjs(
+        prjs_rebin_a,
+        prjs_rebin_b,
+        padding_params,
+        (projector_rebin_a.nu + 1) / 2 + projector_rebin_a.off_u,
+        (projector_rebin_b.nu + 1) / 2 + projector_rebin_a.off_u,
+        projector_rebin_a.dv,
+        transit_len
+    )
+
+    istart_a, istart_b = _get_first_angle_ind(padding_params, nview_margin_pre_a, nview_margin_pre_b)
+
+    return prjs_rebin_ab, istart_a, istart_b
+
+
+# %%
+'''
+backprojection functions. The parallel filtering is from parallel.ramp_filter
+'''
+
+
+def fbp_bp(
+    projector: ct_projector,
+    prj: np.array,
+    theta0: float,
+    zrot: float,
+    m_pi: int = 1,
+    q_value: float = 0.5
+) -> np.array:
+    '''
+    Helical rebinned parallel beam backprojection, pixel driven.
+    The sampling angles need to be evenly distributed.
+
+    Parameters
+    ----------------
+    prj: np.array(float32) of size [batch, nview, nv, nu].
+        The projection to be backprojected. The size does not need to be the same
+        with projector.nview, projector.nv, projector.nu.
+    theta0: float.
+        The starting sampling angle.
+    zrot: float.
+        Source z movement per rotation.
+    m_pi: int.
+        The BP will look within [theta - mPI * PI, theta + mPI * PI]
+    q_value: float.
+        Smoothing parameter for weighting
+
+    Returns
+    --------------
+    img: np.array(float32) of size [batch, projector.nz, projector.ny, projector.nx]
+        The backprojected image.
+    '''
+
+    prj = prj.astype(np.float32)
+    img = np.zeros([prj.shape[0], projector.nz, projector.ny, projector.nx], np.float32)
+
+    module.cfbpHelicalParallelRebinBackprojection.restype = c_int
+
+    err = module.cfbpHelicalParallelRebinBackprojection(
+        img.ctypes.data_as(POINTER(c_float)),
+        prj.ctypes.data_as(POINTER(c_float)),
+        c_ulong(img.shape[0]),
+        c_ulong(img.shape[3]),
+        c_ulong(img.shape[2]),
+        c_ulong(img.shape[1]),
+        c_float(projector.dx),
+        c_float(projector.dy),
+        c_float(projector.dz),
+        c_float(projector.cx),
+        c_float(projector.cy),
+        c_float(projector.cz),
+        c_ulong(prj.shape[3]),
+        c_ulong(prj.shape[2]),
+        c_ulong(prj.shape[1]),
+        c_float(projector.du),
+        c_float(projector.dv),
+        c_float(projector.off_u),
+        c_float(projector.off_v),
+        c_float(projector.dsd),
+        c_float(projector.dso),
+        c_int(int(projector.rotview / 2)),
+        c_float(theta0),
+        c_float(zrot),
+        c_int(m_pi),
+        c_float(q_value)
+    )
+
+    if err != 0:
+        print(err)
+
+    return img
