@@ -800,7 +800,7 @@ def fbp_long(
         recon_z0_relative = z0_batch - (z0 + iprj_start_batch * zrot / projector.rotview)
         projector_batch = copy.deepcopy(projector)
         projector_batch.nz = nz_batch
-        projector_batch.cz = recon_z0_relative + projector_batch.nz / 2
+        projector_batch.cz = recon_z0_relative + projector_batch.nz * projector_batch.dz / 2
 
         fprj_batch = ramp_filter(
             projector_batch,
