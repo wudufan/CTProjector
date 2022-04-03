@@ -89,71 +89,21 @@ __global__ void AccumulateKernelY(float* dst, const float* src, size_t nx, size_
 	}
 }
 
-/*
-Distance driven fanbeam projection
-
-pPrjs - projection of size [nview, nv, nu]
-pAccX - accumulation of images along x, size [nz, ny, nx+1]
-pAccY - accumulation of images along y, size [nz, ny+1, nx]
-pDeg - projection angles, size [nview]
-nviews - total view number
-grid - image grid
-det - detector information
-dsd - distance between source and detector
-dso - distance between source and iso-center
-
-*/
-__global__ void DDFPFanKernel(
-	float* pPrjs,
+// Trace the distance driven forward projection
+__device__ float DDFPTracing(
 	const float* pAccX,
 	const float* pAccY,
-	const float* pDeg,
-	size_t nview,
-	const Grid grid,
-	const Detector det,
-	float dsd,
-	float dso
+	float2 src,
+	float2 dst1,
+	float2 dst2,
+	float z,
+	float deg,
+	float a,
+	float cosDeg,
+	float sinDeg,
+	const Grid& grid
 )
 {
-	int iu = blockDim.x * blockIdx.x + threadIdx.x;
-	int iv = blockDim.y * blockIdx.y + threadIdx.y;
-	int iview = blockIdx.z * blockDim.z + threadIdx.z;
-
-	if (iu >= det.nu || iv >= det.nv || iview >= nview)
-	{
-		return;
-	}
-
-	float deg = pDeg[iview];
-
-	float cosDeg = __cosf(deg);
-	float sinDeg = __sinf(deg);
-	float a = (-(iu - (det.nu-1) / 2.0f) - det.off_u) * det.du;
-	float sin_a = __sinf(a);
-	float cos_a = __cosf(a);
-	float z = (iv - (det.nv-1) / 2.0f + det.off_v) * det.dv;
-
-	// calculate the coordinates of the detector cell's edges
-	float2 src = make_float2(dso * sinDeg, -dso * cosDeg);
-	float2 dst1 = make_float2(dsd * __sinf(a - det.du / 2), -dso + dsd * __cosf(a - det.du / 2));
-	float2 dst2 = make_float2(dsd * __sinf(a + det.du / 2), -dso + dsd * __cosf(a + det.du / 2));
-	dst1 = make_float2(dst1.x * cosDeg - dst1.y * sinDeg, dst1.x * sinDeg + dst1.y * cosDeg);
-	dst2 = make_float2(dst2.x * cosDeg - dst2.y * sinDeg, dst2.x * sinDeg + dst2.y * cosDeg);
-
-	// convert to image coordinate
-	src = PhysicsToImg(src, grid);
-	dst1 = PhysicsToImg(dst1, grid);
-	dst2 = PhysicsToImg(dst2, grid);
-	z = (z - grid.cz) / grid.dz + grid.nz / 2.f - 0.5f;
-
-	// make sure dst1.x < dst2.x
-	if (dst1.x > dst2.x)
-	{
-		float2 temp = dst1;
-		dst1 = dst2;
-		dst2 = temp;
-	}
-
 	float val = 0;
 	// calculate the intersection with at each y
 	if (fabsf(cosDeg) > fabsf(sinDeg))
@@ -210,7 +160,77 @@ __global__ void DDFPFanKernel(
 		// normalize by length
 		val *= grid.dx / fabsf(__sinf(deg - a));
 	}
+
+	return val;
+}
+
+/*
+Distance driven fanbeam projection
+
+pPrjs - projection of size [nview, nv, nu]
+pAccX - accumulation of images along x, size [nz, ny, nx+1]
+pAccY - accumulation of images along y, size [nz, ny+1, nx]
+pDeg - projection angles, size [nview]
+nviews - total view number
+grid - image grid
+det - detector information
+dsd - distance between source and detector
+dso - distance between source and iso-center
+
+*/
+__global__ void DDFPFanKernel(
+	float* pPrjs,
+	const float* pAccX,
+	const float* pAccY,
+	const float* pDeg,
+	size_t nview,
+	const Grid grid,
+	const Detector det,
+	float dsd,
+	float dso
+)
+{
+	int iu = blockDim.x * blockIdx.x + threadIdx.x;
+	int iv = blockDim.y * blockIdx.y + threadIdx.y;
+	int iview = blockIdx.z * blockDim.z + threadIdx.z;
+
+	if (iu >= det.nu || iv >= det.nv || iview >= nview)
+	{
+		return;
+	}
+
+	float deg = pDeg[iview];
+
+	float cosDeg = __cosf(deg);
+	float sinDeg = __sinf(deg);
+	float a = (-(iu - (det.nu-1) / 2.0f) - det.off_u) * det.du;
+	float z = (iv - (det.nv-1) / 2.0f + det.off_v) * det.dv;
+
+	// calculate the coordinates of the detector cell's edges
+	float2 src = make_float2(dso * sinDeg, -dso * cosDeg);
+	float2 dst1 = make_float2(dsd * __sinf(a - det.du / 2), -dso + dsd * __cosf(a - det.du / 2));
+	float2 dst2 = make_float2(dsd * __sinf(a + det.du / 2), -dso + dsd * __cosf(a + det.du / 2));
+	dst1 = make_float2(dst1.x * cosDeg - dst1.y * sinDeg, dst1.x * sinDeg + dst1.y * cosDeg);
+	dst2 = make_float2(dst2.x * cosDeg - dst2.y * sinDeg, dst2.x * sinDeg + dst2.y * cosDeg);
+
+	// convert to image coordinate
+	src = PhysicsToImg(src, grid);
+	dst1 = PhysicsToImg(dst1, grid);
+	dst2 = PhysicsToImg(dst2, grid);
+	z = (z - grid.cz) / grid.dz + grid.nz / 2.f - 0.5f;
+
+	// make sure dst1.x < dst2.x
+	if (dst1.x > dst2.x)
+	{
+		float2 temp = dst1;
+		dst1 = dst2;
+		dst2 = temp;
+	}
 	
+	float val = DDFPTracing(
+		pAccX, pAccY, src, dst1, dst2, z, deg, a, cosDeg, sinDeg, grid
+	);
+
 	pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] = val;
 
 }
