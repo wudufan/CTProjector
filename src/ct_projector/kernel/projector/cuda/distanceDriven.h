@@ -35,13 +35,6 @@ public:
 class DistanceDrivenParallel: public DistanceDrivenFan
 {
 public:
-	// memories needed
-	float* pAccX;
-	float* pAccY;
-	float* pAccU;
-	float* pWeightedPrjs;
-
-public:
 	DistanceDrivenParallel(): DistanceDrivenFan() 
 	{
 	}

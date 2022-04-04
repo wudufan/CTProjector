@@ -92,30 +92,31 @@ By tf-compatible, it means that the module is programmed to:
 
 ### Cupy and Numpy Modules
 
-Name | Beam | Detector | Trajectory | Algorithm | tf-compatible | Comments 
----- | ---- | ---- | ---- | ---- | ---- | ----
-siddon_cone_fp(bp)_abitrary | Conebeam| Flat panel| Abitrary | Siddon | Yes | None
-distance_driven_fp(bp)_tomo | Conebeam| Flat panel| Tomosynthesis | Distance-driven | No | The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
-siddon_fan_fp(bp) | Fanbeam | Equiangular| Circular | Siddon | No | numpy-only
-ramp_filter/fbp_fan_bp | Fanbeam | Equiangular| Circular | FBP | No | numpy-only. Filter + pixel-driven BP
-ramp_filter | Parallel beam | Equispace | Circular | FBP | No | numpy-only.
-helical parallel rebin/BP | Conebeam | Equiangular | Helical | Rebin to parallel and FBP | No | numpy-only. Rebin + parallel.ramp_filter + BP for reconstruction. There is also padding functions to handle the Siemens dual source CT. The parallel conebeam rebinning is more accurate than single-slice rebinning and introduce less error between the A and B reconstructions.
-distance_driven_fan_fp(bp) | Fanbeam | Equiangular| Circular | Distance-driven | Yes | cupy-only
+Cupy/Numpy | Module | Name | Detector | Trajectory | Algorithm | tf-compatible | Comments 
+---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- 
+cupy, numpy | cone | siddon_fp(bp)_arbitrary | Conebeam flat panel | Abitrary | Siddon | Yes |
+cupy, numpy | tomo | distance_driven_fp(bp) | Conebeam flat panel | Tomosynthesis | Distance driven | No | The main axis should always be z. Detector assumed u=(1,0,0), v=(0,1,0)
+numpy | fan_equiangular | siddon_fp(bp) | Fanbeam equiangular | Circular | Siddon | No |
+numpy | fan_equiangular | ramp_filter, fbp_bp | Fanbeam equiangular | Circular | Pixel driven FBP | No |
+cupy | fan_equiangular | distance_driven_fp(bp) | Fanbeam equiangular | Circular | Distance driven | Yes |
+cupy | parallel | distance_driven_fp(bp) | Parallel beam | Circular | Distance driven | Yes |
+numpy | parallel | ramp_filter | Parallel beam | Circular | Filter | No |
+numpy | helical_equiangular_parallel_rebin | helical parallel rebin/BP | Conebeam equiangular | Helical | Rebin to parallel and FBP | No | Rebin + parallel.ramp_filter + BP for reconstruction. There is also padding functions to handle the Siemens dual source CT. The parallel conebeam rebinning is more accurate than single-slice rebinning and introduce less error between the A and B reconstructions.
 
 ### Tensorflow Modules
 
-Name | Beam | Detector | Trajectory | Algorithm | Comments 
+Module | Name | Detector | Trajectory | Algorithm | Comments 
 ---- | ---- | ---- | ---- | ---- | ---- 
-siddon_cone_fp(bp)_abitrary | Conebeam| Flat panel| Abitrary | Siddon | None
+cone | SiddonFP(BP)Arbitrary | Conebeam flat panel | Arbitrary | Siddon | None
 
 ### Priors
 
-Name | Supported denoising method | Supported priors | Supported algorithms | Comments
----- | ---- | ---- | ---- | ----
-nlm | (Guided) Non-local mean | Gaussian | SQS | Needed component for Gaussian in SQS can be realized by calling nlm
+Cupy/Numpy | Name | Supported denoising method | Supported priors | Supported algorithms | Comments
+---- | ---- | ---- | ---- | ---- | ----
+cupy, numpy | nlm | (Guided) Non-local mean | Gaussian | SQS | Needed component for Gaussian in SQS can be realized by calling nlm
 
 ### Reconstruction Algorithms
 
-Name | Comments
----- | ----
-sqs_gaussian | cupy only
+Cupy/Numpy | Name | Comments
+---- | ---- | ----
+cupy | sqs_gaussian | 
