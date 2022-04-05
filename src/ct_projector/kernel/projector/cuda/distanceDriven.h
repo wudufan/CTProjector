@@ -1,3 +1,5 @@
+#pragma once
+
 #include "projector.h"
 
 class DistanceDrivenFan: public Projector
