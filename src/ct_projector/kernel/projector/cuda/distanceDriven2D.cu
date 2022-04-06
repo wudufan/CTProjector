@@ -12,6 +12,7 @@ using namespace std;
 void DistanceDrivenFan::Allocate(bool forward, bool backward)
 {
 	this->Free();
+	Projector::Allocate(forward, backward);
 
 	if (forward)
 	{
@@ -38,12 +39,25 @@ void DistanceDrivenFan::Allocate(bool forward, bool backward)
 	
 }
 
+void DistanceDrivenFan::AllocateExternal(float* pAccXEx, float* pAccYEx, float* pAccUEx, float* pWeightedPrjsEx) {
+	this->Free();
+	Projector::AllocateExternal();
+
+	pAccX = pAccXEx;
+	pAccY = pAccYEx;
+	pAccU = pAccUEx;
+	pWeightedPrjs = pWeightedPrjsEx;
+	
+}
+
 void DistanceDrivenFan::Free()
 {
-	if (pAccX != NULL) cudaFree(pAccX);
-	if (pAccY != NULL) cudaFree(pAccY);
-	if (pAccU != NULL) cudaFree(pAccU);
-	if (pWeightedPrjs != NULL) cudaFree(pWeightedPrjs);
+	if (!m_externalBuffer) {
+		if (pAccX != NULL) cudaFree(pAccX);
+		if (pAccY != NULL) cudaFree(pAccY);
+		if (pAccU != NULL) cudaFree(pAccU);
+		if (pWeightedPrjs != NULL) cudaFree(pWeightedPrjs);
+	}
 
 	pAccX = NULL;
 	pAccY = NULL;

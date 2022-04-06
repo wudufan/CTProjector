@@ -59,3 +59,9 @@ class ct_projector:
         self.nx = int(self.nx)
         self.ny = int(self.ny)
         self.nz = int(self.nz)
+
+    def get_angles(self) -> np.array:
+        '''
+        Get the angles for each view in circular geometry.
+        '''
+        return np.arange(0, self.nview, dtype=np.float32) * 2 * np.pi / self.nview

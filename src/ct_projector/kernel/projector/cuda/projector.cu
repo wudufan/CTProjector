@@ -17,6 +17,7 @@ extern "C" int SetDevice(int device)
 Projector::Projector()
 {
 	m_stream = NULL;
+	m_externalBuffer = false;
 
 	nBatches = 0;
 

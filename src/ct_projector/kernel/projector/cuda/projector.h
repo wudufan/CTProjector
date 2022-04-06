@@ -158,7 +158,8 @@ public:
 
 public:
 	// allocate all the needed memory in advance for tensorflow compatibility
-	virtual void Allocate(bool forward = true, bool backward = true) {};
+	virtual void Allocate(bool forward = true, bool backward = true) { m_externalBuffer = true; }
+	void AllocateExternal() { m_externalBuffer = false; }
 	virtual void Free() {};
 
 public:
@@ -167,6 +168,7 @@ public:
 
 protected:
 	cudaStream_t m_stream;
+	bool m_externalBuffer;
 
 public:
 	Projector();

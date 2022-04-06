@@ -27,6 +27,7 @@ public:
 
 public:
 	void Allocate(bool forward = true, bool backward = true) override;
+	void AllocateExternal(float* pAccXEx, float* pAccYEx, float* pAccUEx, float* pWeightedPrjsEx);
 	void Free() override;
 
 public:

@@ -27,6 +27,28 @@ using CPUDevice = Eigen::ThreadPoolDevice;
 using GPUDevice = Eigen::GpuDevice;
 using ::tensorflow::shape_inference::DimensionHandle;
 
+// Use the tensorflow interface to allocate the memories
+void AllocateBufferFP(
+    Tensor& accXTensor,
+    Tensor& accYTensor,
+    int nx,
+    int ny,
+    int nz,
+    OpKernelContext* context
+) {
+    TensorShape shapeAccX;
+    shapeAccX.AddDim(nz);
+    shapeAccX.AddDim(ny);
+    shapeAccX.AddDim(nx + 1);
+    OP_REQUIRES_OK(context, context->allocate_temp(DT_FLOAT, shapeAccX, &accXTensor));
+
+    TensorShape shapeAccY;
+    shapeAccY.AddDim(nz);
+    shapeAccY.AddDim(ny + 1);
+    shapeAccY.AddDim(nx);
+    OP_REQUIRES_OK(context, context->allocate_temp(DT_FLOAT, shapeAccY, &accYTensor));
+}
+
 /*
 
 Distance driven forward projection tensorflow op
@@ -64,9 +86,9 @@ projection: tensor of shape [batch, channel, nview, nv, nu]. Python should handl
 
 */
 // 
-REGISTER_OP("DistanceDriven2DFP")
+REGISTER_OP("DistanceDriven_2D_FP")
     .Attr("default_shape: list(int) >= 3")
-    .Attr("type_geometry: int32")
+    .Attr("type_geometry: int")
     .Input("image: float")
     .Input("angles: float")
     .Input("dso: float")
@@ -174,6 +196,12 @@ public:
         size_t prjBatchStride = prjTensor->dim_size(4) * prjTensor->dim_size(3) * prjTensor->dim_size(2) * prjTensor->dim_size(1);
         cudaStreamSynchronize(stream);
 
+        // allocate buffer for forward projection
+        Tensor accX;
+        Tensor accY;
+        AllocateBufferFP(accX, accY, imgTensor.dim_size(4), imgTensor.dim_size(3), imgTensor.dim_size(2), context);
+        ((DistanceDrivenFan*)projector)->AllocateExternal(accX.flat<float>().data(), accY.flat<float>().data(), NULL, NULL);
+
         // do the projection for each entry in the batch
         for (int i = 0; i < batchsize; i++)
         {
@@ -198,7 +226,7 @@ public:
                 dsd[i],
                 dso[i]
             );
-        
+
             // forward projection
             projector->Projection(
                 imgTensor.flat<float>().data() + i * imgBatchStride,
@@ -207,8 +235,10 @@ public:
             );
         }
 
+        projector->Free();
+
     }
 
 };
 
-REGISTER_KERNEL_BUILDER(Name("DistanceDriven2DFP").Device(DEVICE_GPU), DistanceDriven2DFPOp<GPUDevice>);
+REGISTER_KERNEL_BUILDER(Name("DistanceDriven_2D_FP").Device(DEVICE_GPU), DistanceDriven2DFPOp<GPUDevice>);
