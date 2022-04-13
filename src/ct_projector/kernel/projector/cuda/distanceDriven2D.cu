@@ -531,6 +531,7 @@ extern "C" int cDistanceDrivenFanProjection(
 	float* pcuImg = NULL;
 	float* pcuPrj = NULL;
 	float* pcuDeg = NULL;
+
 	try
 	{
 		if (cudaSuccess != cudaMalloc(&pcuImg, sizeof(float) * nBatches * nx * ny * nz))
@@ -563,12 +564,13 @@ extern "C" int cDistanceDrivenFanProjection(
 		projector.Free();
 
 		cudaMemcpy(prj, pcuPrj, sizeof(float) * nBatches * nu * nv * nview, cudaMemcpyDeviceToHost);
+
 	}
-	catch (exception &e)
+	catch (exception& e)
 	{
 		ostringstream oss;
-		oss << "cDistanceDrivenFanProjection failed: " << e.what()
-			<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+		oss << "cDistanceDrivenFanProjection() failed: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
 
@@ -577,9 +579,83 @@ extern "C" int cDistanceDrivenFanProjection(
 	if (pcuDeg != NULL) cudaFree(pcuDeg);
 
 	return cudaGetLastError();
-
 }
 
+
+extern "C" int cDistanceDrivenParallelProjection(
+	float* prj,
+	const float* img,
+	const float* deg,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float da,
+	float dv,
+	float off_a,
+	float off_v
+)
+{
+	float* pcuImg = NULL;
+	float* pcuPrj = NULL;
+	float* pcuDeg = NULL;
+
+	try
+	{
+		if (cudaSuccess != cudaMalloc(&pcuImg, sizeof(float) * nBatches * nx * ny * nz))
+		{
+			throw runtime_error("pcuImg allocation failed");
+		}
+
+		if (cudaSuccess != cudaMalloc(&pcuPrj, sizeof(float) * nBatches * nu * nv * nview))
+		{
+			throw runtime_error("pcuPrj allocation failed");
+		}
+
+		if (cudaSuccess != cudaMalloc(&pcuDeg, sizeof(float) * nview))
+		{
+			throw runtime_error("pcuDeg allocation failed");
+		}
+
+		cudaMemcpy(pcuDeg, deg, sizeof(float) * nview, cudaMemcpyHostToDevice);
+		cudaMemcpy(pcuImg, img, sizeof(float) * nBatches * nx * ny * nz, cudaMemcpyHostToDevice);
+		cudaMemset(pcuPrj, 0, sizeof(float) * nBatches * nu * nv * nview);
+
+		DistanceDrivenParallel projector;
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+			nu, nv, nview, da, dv, off_a, off_v, 1000, 500
+		);
+		
+		projector.Allocate(true, false);
+		projector.Projection(pcuImg, pcuPrj, pcuDeg);
+		projector.Free();
+
+		cudaMemcpy(prj, pcuPrj, sizeof(float) * nBatches * nu * nv * nview, cudaMemcpyDeviceToHost);
+	}
+	catch (exception& e)
+	{
+		ostringstream oss;
+		oss << "cDistanceDrivenParallelProjection() failed: " << e.what()
+			<< " (" << cudaGetErrorString(cudaGetLastError()) << ")";
+		cerr << oss.str() << endl;
+	}
+
+	if (pcuImg != NULL) cudaFree(pcuImg);
+	if (pcuPrj != NULL) cudaFree(pcuPrj);
+	if (pcuDeg != NULL) cudaFree(pcuDeg);
+
+	return cudaGetLastError();
+}
 
 
 /*
@@ -972,7 +1048,7 @@ extern "C" int cupyDistanceDrivenFanBackprojection(
 	catch (exception &e)
 	{
 		ostringstream oss;
-		oss << "cDistanceDrivenFanBackprojection failed: " << e.what()
+		oss << "cupyDistanceDrivenFanBackprojection failed: " << e.what()
 			<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
@@ -1020,7 +1096,7 @@ extern "C" int cupyDistanceDrivenParallelBackprojection(
 	catch (exception &e)
 	{
 		ostringstream oss;
-		oss << "cDistanceDrivenParallelBackprojection failed: " << e.what()
+		oss << "cupyDistanceDrivenParallelBackprojection failed: " << e.what()
 			<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
 	}
@@ -1029,23 +1105,45 @@ extern "C" int cupyDistanceDrivenParallelBackprojection(
 
 }
 
-/*
-extern "C" void cDistanceDrivenFanBackprojection(float* img, const float* prj, const float* deg,
-		int nBatches, int nChannels, int nx, int ny, int nz, float dx, float dy, float dz,
-		int nu, int nview, int nv, float da, float dv, float off_a, float off_v,
-		float dsd, float dso, int typeProjector)
+
+extern "C" int cDistanceDrivenFanBackprojection(
+	float* img,
+	const float* prj,
+	const float* deg,
+	size_t nBatches, 
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float da,
+	float dv,
+	float off_a,
+	float off_v,
+	float dsd,
+	float dso,
+	int typeProjector
+)
 {
 	float* pcuImg = NULL;
 	float* pcuPrj = NULL;
 	float* pcuDeg = NULL;
+
 	try
 	{
-		if (cudaSuccess != cudaMalloc(&pcuImg, sizeof(float) * nBatches * nx * ny * nz * nChannels))
+		if (cudaSuccess != cudaMalloc(&pcuImg, sizeof(float) * nBatches * nz * ny * nx))
 		{
 			throw runtime_error("pcuImg allocation failed");
 		}
 
-		if (cudaSuccess != cudaMalloc(&pcuPrj, sizeof(float) * nBatches * nu * nview * nv * nChannels))
+		if (cudaSuccess != cudaMalloc(&pcuPrj, sizeof(float) * nBatches * nview * nv * nu))
 		{
 			throw runtime_error("pcuPrj allocation failed");
 		}
@@ -1056,32 +1154,104 @@ extern "C" void cDistanceDrivenFanBackprojection(float* img, const float* prj, c
 		}
 
 		cudaMemcpy(pcuDeg, deg, sizeof(float) * nview, cudaMemcpyHostToDevice);
-		cudaMemcpy(pcuPrj, prj, sizeof(float) * nBatches * nu * nview * nv * nChannels, cudaMemcpyHostToDevice);
-		cudaMemset(pcuImg, 0, sizeof(float) * nBatches * nx * ny * nz * nChannels);
+		cudaMemcpy(pcuPrj, prj, sizeof(float) * nBatches * nview * nv * nu, cudaMemcpyHostToDevice);
+		cudaMemset(pcuImg, 0, sizeof(float) * nBatches * nz * ny * nx);
+
+		DistanceDrivenFan projector;
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz, nu, nv, nview, da, dv, off_a, off_v, dsd, dso, typeProjector
+		);
+		
+		projector.Allocate(false, true);
+		projector.Backprojection(pcuImg, pcuPrj, pcuDeg);
+		projector.Free();
+
+		cudaMemcpy(img, pcuImg, sizeof(float) * nBatches * nz * ny * nx, cudaMemcpyDeviceToHost);
 	}
 	catch (exception &e)
 	{
-		if (pcuImg != NULL) cudaFree(pcuImg);
-		if (pcuPrj != NULL) cudaFree(pcuPrj);
-		if (pcuDeg != NULL) cudaFree(pcuDeg);
-
 		ostringstream oss;
 		oss << "cDistanceDrivenFanBackprojection failed: " << e.what()
-				<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+			<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
-		throw runtime_error(oss.str().c_str());
 	}
 
-	DistanceDrivenFan projector;
-	projector.Setup(nBatches, nChannels, nx, ny, nz, dx, dy, dz,
-			nu, nview, nv, da, dv, off_a, off_v, dsd, dso, typeProjector);
+	if (pcuImg != NULL) cudaFree(pcuImg);
+	if (pcuPrj != NULL) cudaFree(pcuPrj);
+	if (pcuDeg != NULL) cudaFree(pcuDeg);
 
-	projector.Backprojection(pcuImg, pcuPrj, pcuDeg);
-	cudaMemcpy(img, pcuImg, sizeof(float) * nBatches * nx * ny * nz * nChannels, cudaMemcpyDeviceToHost);
-
-	cudaFree(pcuImg);
-	cudaFree(pcuPrj);
-	cudaFree(pcuDeg);
+	return cudaGetLastError();
 
 }
-*/
+
+extern "C" int cDistanceDrivenParallelBackprojection(
+	float* img,
+	const float* prj,
+	const float* deg,
+	size_t nBatches, 
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float dx,
+	float dy,
+	float dz,
+	float cx,
+	float cy,
+	float cz,
+	size_t nu,
+	size_t nv,
+	size_t nview,
+	float da,
+	float dv,
+	float off_a,
+	float off_v,
+	int typeProjector
+)
+{
+	float* pcuImg = NULL;
+	float* pcuPrj = NULL;
+	float* pcuDeg = NULL;
+
+	try
+	{
+		if (cudaSuccess != cudaMalloc(&pcuImg, sizeof(float) * nBatches * nz * ny * nx))
+		{
+			throw runtime_error("pcuImg allocation failed");
+		}
+
+		if (cudaSuccess != cudaMalloc(&pcuPrj, sizeof(float) * nBatches * nview * nv * nu))
+		{
+			throw runtime_error("pcuPrj allocation failed");
+		}
+
+		if (cudaSuccess != cudaMalloc(&pcuDeg, sizeof(float) * nview))
+		{
+			throw runtime_error("pcuDeg allocation failed");
+		}
+
+		DistanceDrivenParallel projector;
+		projector.Setup(
+			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz, nu, nv, nview, da, dv, off_a, off_v, 1000, 500, typeProjector
+		);
+		
+		projector.Allocate(false, true);
+		projector.Backprojection(pcuImg, pcuPrj, pcuDeg);		
+		projector.Free();
+
+		cudaMemcpy(img, pcuImg, sizeof(float) * nBatches * nz * ny * nx, cudaMemcpyDeviceToHost);
+	}
+	catch (exception &e)
+	{
+		ostringstream oss;
+		oss << "cDistanceDrivenParallelBackprojection failed: " << e.what()
+			<< "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+		cerr << oss.str() << endl;
+	}
+
+	if (pcuImg != NULL) cudaFree(pcuImg);
+	if (pcuPrj != NULL) cudaFree(pcuPrj);
+	if (pcuDeg != NULL) cudaFree(pcuDeg);
+
+	return cudaGetLastError();
+
+}
