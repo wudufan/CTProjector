@@ -158,8 +158,8 @@ public:
 
 public:
 	// allocate all the needed memory in advance for tensorflow compatibility
-	virtual void Allocate(bool forward = true, bool backward = true) { m_externalBuffer = true; }
-	void AllocateExternal() { m_externalBuffer = false; }
+	virtual void Allocate(bool forward = true, bool backward = true) { m_externalBuffer = false; }
+	void AllocateExternal() { m_externalBuffer = true; }
 	virtual void Free() {};
 
 public:
