@@ -1229,6 +1229,10 @@ extern "C" int cDistanceDrivenParallelBackprojection(
 			throw runtime_error("pcuDeg allocation failed");
 		}
 
+		cudaMemcpy(pcuDeg, deg, sizeof(float) * nview, cudaMemcpyHostToDevice);
+		cudaMemcpy(pcuPrj, prj, sizeof(float) * nBatches * nview * nv * nu, cudaMemcpyHostToDevice);
+		cudaMemset(pcuImg, 0, sizeof(float) * nBatches * nz * ny * nx);
+
 		DistanceDrivenParallel projector;
 		projector.Setup(
 			nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz, nu, nv, nview, da, dv, off_a, off_v, 1000, 500, typeProjector

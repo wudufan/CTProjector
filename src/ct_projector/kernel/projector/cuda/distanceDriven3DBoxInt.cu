@@ -284,6 +284,7 @@ void DistanceDrivenTomo::BackprojectionTomoBoxInt(
 Distance driven projection. The projection should always be performed with x or y as the main axis.
 This kernel uses box integral thus no accumulation buffer is needed.
 */
+/*
 __global__ void DDFPConeBoxIntKernelHelical(
 	float* pPrjs,
 	const float* pImg,
@@ -372,3 +373,4 @@ __global__ void DDFPConeBoxIntKernelHelical(
 	pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] = val;
 
 }
+*/

@@ -53,6 +53,7 @@ public:
 /*
 Helical equiangular conebeam projection. Use box integral
 */
+/*
 namespace DistanceDrivenConeProjector {
 	const int equiAngular = 0;
 	const int equiSpace = 1;
@@ -86,6 +87,7 @@ public:
 	void ProjectionHelical(const float* pcuImg, float* pcuPrj, const float* pcuDeg, const float* pcuz);
 	void BackprojectionHelical(float* pcuImg, const float* pcuPrj, const float* pcuDeg, const float* pcuz);
 };
+*/
 
 
 /* 
