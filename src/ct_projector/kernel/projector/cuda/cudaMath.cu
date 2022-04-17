@@ -334,7 +334,7 @@ __device__ float InterpolateYZ(const float* buff, int ix, float y, float z, size
 // Calculate the integral value inside a box
 // integral = (pixel sum) - (edge leftout) + (corner leftout)
 __device__ float IntegralBoxXY(
-	const float* buff, float x1, float y1, float x2, float y2, int iz, size_t nx, size_t ny, size_t nz
+	const float* buff, float x1, float y1, float x2, float y2, const int iz, size_t nx, size_t ny, size_t nz
 )
 {
 	x1 = ClampFloat(x1, 0, nx);
@@ -391,6 +391,138 @@ __device__ float IntegralBoxXY(
 	integral += buff[iz * nx * ny + iy1 * nx + ix2] * (ix2 + 1 - x2) * (y1 - iy1);
 	integral += buff[iz * nx * ny + iy2 * nx + ix1] * (x1 - ix1) * (iy2 + 1 - y2);
 	integral += buff[iz * nx * ny + iy2 * nx + ix2] * (ix2 + 1 - x2) * (iy2 + 1 - y2);
+
+	return integral;
+
+}
+
+
+// Calculate the integral value inside a box
+// integral = (pixel sum) - (edge leftout) + (corner leftout)
+__device__ float IntegralBoxXZ(
+	const float* buff, float x1, float z1, float x2, float z2, const int iy, size_t nx, size_t ny, size_t nz
+)
+{
+	x1 = ClampFloat(x1, 0, nx);
+	z1 = ClampFloat(z1, 0, nz);
+	x2 = ClampFloat(x2, 0, nx);
+	z2 = ClampFloat(z2, 0, nz);
+
+	int ix1 = Clamp(int(x1), 0, nx);
+	int iz1 = Clamp(int(z1), 0, nz);
+	int ix2 = Clamp(int(x2), 0, nx);
+	int iz2 = Clamp(int(z2), 0, nz);
+
+	// there is not area to integral on
+	if (x2 <= x1 || z2 <= z1)
+	{
+		return 0;
+	}
+
+	float integral = 0;	
+
+	// 1. Calculate the integral of all the pixels
+	for (int iz = iz1; iz <= iz2; iz++)
+	{
+		for (int ix = ix1; ix <= ix2; ix++)
+		{
+			integral += buff[iz * nx * ny + iy * nx + ix];
+		}
+	}
+
+	// 2. subtract the integral on the 4 sides
+	// left
+	for (int iz = iz1; iz <= iz2; iz++)
+	{
+		integral -= buff[iz * nx * ny + iy * nx + ix1] * (x1 - ix1);
+	}
+	// right
+	for (int iz = iz1; iz <= iz2; iz++)
+	{
+		integral -= buff[iz * nx * ny + iy * nx + ix2] * (ix2 + 1 - x2);
+	}
+	// top
+	for (int ix = ix1; ix <= ix2; ix++)
+	{
+		integral -= buff[iz1 * nx * ny + iy * nx + ix] * (z1 - iz1);
+	}
+	// bottom
+	for (int ix = ix1; ix <= ix2; ix++)
+	{
+		integral -= buff[iz2 * nx * ny + iy * nx + ix] * (iz2 + 1 - z2);
+	}
+
+	// 3. add the corner integrals
+	integral += buff[iz1 * nx * ny + iy * nx + ix1] * (x1 - ix1) * (z1 - iz1);
+	integral += buff[iz1 * nx * ny + iy * nx + ix2] * (ix2 + 1 - x2) * (z1 - iz1);
+	integral += buff[iz2 * nx * ny + iy * nx + ix1] * (x1 - ix1) * (iz2 + 1 - z2);
+	integral += buff[iz2 * nx * ny + iy * nx + ix2] * (ix2 + 1 - x2) * (iz2 + 1 - z2);
+
+	return integral;
+
+}
+
+
+// Calculate the integral value inside a box
+// integral = (pixel sum) - (edge leftout) + (corner leftout)
+__device__ float IntegralBoxYZ(
+	const float* buff, float y1, float z1, float y2, float z2, const int ix, size_t nx, size_t ny, size_t nz
+)
+{
+	y1 = ClampFloat(y1, 0, ny);
+	z1 = ClampFloat(z1, 0, nz);
+	y2 = ClampFloat(y2, 0, ny);
+	z2 = ClampFloat(z2, 0, nz);
+
+	int iy1 = Clamp(int(y1), 0, ny);
+	int iz1 = Clamp(int(z1), 0, nz);
+	int iy2 = Clamp(int(y2), 0, ny);
+	int iz2 = Clamp(int(z2), 0, nz);
+
+	// there is not area to integral on
+	if (z2 <= z1 || y2 <= y1)
+	{
+		return 0;
+	}
+
+	float integral = 0;	
+
+	// 1. Calculate the integral of all the pixels
+	for (int iy = iy1; iy <= iy2; iy++)
+	{
+		for (int iz = iz1; iz <= iz2; iz++)
+		{
+			integral += buff[iz * nx * ny + iy * nx + ix];
+		}
+	}
+
+	// 2. subtract the integral on the 4 sides
+	// left
+	for (int iy = iy1; iy <= iy2; iy++)
+	{
+		integral -= buff[iz1 * nx * ny + iy * nx + ix] * (z1 - iz1);
+	}
+	// right
+	for (int iy = iy1; iy <= iy2; iy++)
+	{
+		integral -= buff[iz2 * nx * ny + iy * nx + ix] * (iz2 + 1 - z2);
+	}
+	// top
+	for (int iz = iz1; iz <= iz2; iz++)
+	{
+		integral -= buff[iz * nx * ny + iy1 * nx + ix] * (y1 - iy1);
+	}
+	// bottom
+	for (int iz = iz1; iz <= iz2; iz++)
+	{
+		integral -= buff[iz * nx * ny + iy2 * nx + ix] * (iy2 + 1 - y2);
+	}
+
+	// 3. add the corner integrals
+	integral += buff[iz1 * nx * ny + iy1 * nx + ix] * (z1 - iz1) * (y1 - iy1);
+	integral += buff[iz2 * nx * ny + iy1 * nx + ix] * (iz2 + 1 - z2) * (y1 - iy1);
+	integral += buff[iz1 * nx * ny + iy2 * nx + ix] * (z1 - iz1) * (iy2 + 1 - y2);
+	integral += buff[iz2 * nx * ny + iy2 * nx + ix] * (iz2 + 1 - z2) * (iy2 + 1 - y2);
 
 	return integral;
 

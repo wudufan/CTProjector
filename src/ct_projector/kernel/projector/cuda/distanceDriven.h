@@ -50,6 +50,44 @@ public:
 	void Backprojection(float* pcuImg, const float* pcuPrj, const float* pcuDeg) override;
 };
 
+/*
+Helical equiangular conebeam projection. Use box integral
+*/
+namespace DistanceDrivenConeProjector {
+	const int equiAngular = 0;
+	const int equiSpace = 1;
+	const int equiAngularFbp = 2;
+	const int equiSpaceFbp = 3;
+}
+
+class DistanceDrivenCone: public Projector
+{
+public:
+	// memories needed
+	float* pWeightedPrjs;
+
+public:
+	DistanceDrivenCone(): Projector() 
+	{
+		this->pWeightedPrjs = NULL;
+	}
+
+	~DistanceDrivenCone() 
+	{ 
+		this->Free(); 
+	}
+
+public:
+	void Allocate(bool forward = true, bool backward = true) override;
+	void AllocateExternal(float* pWeightedPrjsEx);
+	void Free() override;
+
+public:
+	void ProjectionHelical(const float* pcuImg, float* pcuPrj, const float* pcuDeg, const float* pcuz);
+	void BackprojectionHelical(float* pcuImg, const float* pcuPrj, const float* pcuDeg, const float* pcuz);
+};
+
+
 /* 
 For the tomosynthesis, assumed that detU is x axis, detV is y axis.
 The source-to-detector-center is always within 45 degrees to the z axis.

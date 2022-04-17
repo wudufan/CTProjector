@@ -129,5 +129,11 @@ __device__ float InterpolateYZ(const float* buff, int ix, float y, float z, size
 
 // 2d integration inside a box
 __device__ float IntegralBoxXY(
-	const float* buff, float x1, float y1, float x2, float y2, int iz, size_t nx, size_t ny, size_t nz
+	const float* buff, float x1, float y1, float x2, float y2, const int iz, size_t nx, size_t ny, size_t nz
+);
+__device__ float IntegralBoxXZ(
+	const float* buff, float x1, float z1, float x2, float z2, const int iy, size_t nx, size_t ny, size_t nz
+);
+__device__ float IntegralBoxYZ(
+	const float* buff, float y1, float z1, float y2, float z2, const int ix, size_t nx, size_t ny, size_t nz
 );
