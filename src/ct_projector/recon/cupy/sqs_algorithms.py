@@ -11,6 +11,41 @@ import ct_projector.prior.cupy as recon_prior
 from ct_projector.projector.cupy import ct_projector
 
 
+def sqs_one_step(
+    projector: ct_projector,
+    img: cp.array,
+    prj: cp.array,
+    norm_img: cp.array,
+    projector_norm: float,
+    beta: float,
+    prior_func: Callable[..., Union[cp.array, Tuple[Any, ...]]],
+    weight: cp.array = None,
+    return_loss: bool = False,
+    **kwargs
+):
+    if weight is None:
+        weight = 1
+
+    # A.Tw(Ax)
+    fp = projector.fp(img) / projector_norm
+    fp = fp - prj / projector_norm
+    bp = projector.bp(fp * weight) / projector_norm
+
+    # sqs
+    kwargs['img'] = img
+    prior_res = prior_func(**kwargs)
+    img = img - (bp + beta * prior_res[0]) / (norm_img + beta * prior_res[1])
+
+    if return_loss:
+        fp = projector.fp(img) / projector_norm
+        data_loss = 0.5 * cp.sum(weight * (fp - prj / projector_norm)**2)
+        prior_loss = cp.sum(prior_res[2])
+
+        return img, data_loss, prior_loss
+    else:
+        return img
+
+
 def sqs_gaussian_one_step(
     projector: ct_projector,
     img: cp.array,

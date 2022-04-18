@@ -80,3 +80,56 @@ def nlm(
         print(err)
 
     return res
+
+
+def tv_sqs(
+    img: cp.array,
+    weights: Tuple[float, float, float],
+    eps: float = 1e-8
+):
+    '''
+    The TV prior for SQS algorithm.
+
+    Parameters
+    -----------------
+    img: cp.array(float32) of shape [batch, nz, ny, nx].
+        The image to be calculated for TV prior.
+    weights: tuple of length 3.
+        The weighting factor along z, y, x.
+    eps: float.
+        The normalization at x = 0.
+
+    Returns
+    ------------------
+    s1: cp.array(float32) of shape [batch, nz, ny, nx].
+        The first-order derivative of the prior.
+    s2: cp.array(float32) of shape [batch, nz, ny, nx].
+        The second-order derivative of the prior.
+    var: cp.array(float32) of shape [batch, nz, ny, nx].
+        The variation map.
+    '''
+
+    module.cupyTVSQS3D.restype = c_int
+    s1 = cp.zeros(img.shape, cp.float32)
+    s2 = cp.zeros(img.shape, cp.float32)
+    var = cp.zeros(img.shape, cp.float32)
+
+    err = module.cupyTVSQS3D(
+        c_void_p(s1.data.ptr),
+        c_void_p(s2.data.ptr),
+        c_void_p(var.data.ptr),
+        c_void_p(img.data.ptr),
+        c_float(weights[2]),
+        c_float(weights[1]),
+        c_float(weights[0]),
+        c_ulong(img.shape[0]),
+        c_ulong(img.shape[3]),
+        c_ulong(img.shape[2]),
+        c_ulong(img.shape[1]),
+        c_float(eps)
+    )
+
+    if not err == 0:
+        print(err)
+
+    return s1, s2, var

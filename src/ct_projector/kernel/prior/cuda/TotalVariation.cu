@@ -145,28 +145,80 @@ __global__ void TVSQS3DKernel(
 
 }
 
-// get first and second order derivatives of the surrogate function
-// get the variation of the image
+/*
+s1 - first order derivative of the TV prior, to be calculated
+s2 - second order derivative of the TV prior, to be calculated
+var - the variation at each pixel, to be calculated
+img - the original image
+wx, wy, wz - the weights along x, y, and z
+nBatches, nx, ny, nz - image dimension. s1, s2, var, img are by the shape (nBatches, nz, ny, nx)
+eps - the smoothing factor at x=0 for TV
+*/
 void TVSQS3D_gpu(
-	float* s1, float* s2, float* var, const float* img, float wx, float wy, float wz, size_t nx, size_t ny, size_t nz, float eps
+	float* s1,
+	float* s2,
+	float* var,
+	const float* img,
+	float wx,
+	float wy,
+	float wz,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float eps
 )
 {
 	dim3 threads(32, 16, 1);
 	dim3 blocks(ceilf(nx / (float)threads.x), ceilf(ny / (float)threads.y), nz);
 
-    Variation3DKernel<<<blocks, threads>>>(var, img, wx, wy, wz, nx, ny, nz, eps);
-    TVSQS3DKernel<<<blocks, threads>>>(s1, s2, var, img, wx, wy, wz, nx, ny, nz);
+	for (int i = 0; i < nBatches; i++) {
+		int offset = i * nx * ny * nz;
+
+		Variation3DKernel<<<blocks, threads>>>(var + offset, img + offset, wx, wy, wz, nx, ny, nz, eps);
+    	TVSQS3DKernel<<<blocks, threads>>>(s1 + offset, s2 + offset, var + offset, img + offset, wx, wy, wz, nx, ny, nz);
+	}
 
 }
 
-extern "C" void cTVSQS3D(
+
+extern "C" int cupyTVSQS3D(
 	float* s1,
 	float* s2,
 	float* var,
 	const float* img,
-    float wx,
+	float wx,
 	float wy,
 	float wz,
+	size_t nBatches,
+	size_t nx,
+	size_t ny,
+	size_t nz,
+	float eps = 1e-8f
+) {
+	try
+	{
+		TVSQS3D_gpu(s1, s2, var, img, wx, wy, wz, nBatches, nx, ny, nz, eps);
+	}
+	catch (exception& e)
+	{
+		ostringstream oss;
+		oss << "cupyTVSQS3D failed: " << e.what() << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+		cerr << oss.str() << endl;
+	}
+
+	return cudaGetLastError();
+}
+
+extern "C" int cTVSQS3D(
+	float* s1,
+	float* s2,
+	float* var,
+	const float* img,
+	float wx,
+	float wy,
+	float wz,
+	size_t nBatches,
 	size_t nx,
 	size_t ny,
 	size_t nz,
@@ -201,7 +253,7 @@ extern "C" void cTVSQS3D(
 
 		cudaMemcpy(pcuImg, img, sizeof(float) * N, cudaMemcpyHostToDevice);
 
-		TVSQS3D_gpu(pcus1, pcus2, pcuVar, pcuImg, wx, wy, wz, nx, ny, nz, eps);
+		TVSQS3D_gpu(pcus1, pcus2, pcuVar, pcuImg, wx, wy, wz, nBatches, nx, ny, nz, eps);
 
 		cudaMemcpy(s1, pcus1, sizeof(float) * N, cudaMemcpyDeviceToHost);
 		cudaMemcpy(s2, pcus2, sizeof(float) * N, cudaMemcpyDeviceToHost);
@@ -209,20 +261,16 @@ extern "C" void cTVSQS3D(
 	}
 	catch (exception& e)
 	{
-		if (pcus1 != NULL) cudaFree(pcus1);
-		if (pcus2 != NULL) cudaFree(pcus2);
-		if (pcuVar != NULL) cudaFree(pcuVar);
-		if (pcuImg != NULL) cudaFree(pcuImg);
-
 		ostringstream oss;
 		oss << "cTVSQS3D failed: " << e.what() << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
 		cerr << oss.str() << endl;
-		throw runtime_error(oss.str().c_str());
 	}
 
-	cudaFree(pcus1);
-	cudaFree(pcus2);
-	cudaFree(pcuVar);
-	cudaFree(pcuImg);
+	if (pcus1 != NULL) cudaFree(pcus1);
+	if (pcus2 != NULL) cudaFree(pcus2);
+	if (pcuVar != NULL) cudaFree(pcuVar);
+	if (pcuImg != NULL) cudaFree(pcuImg);
+
+	return cudaGetLastError();
 
 }
