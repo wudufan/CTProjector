@@ -230,8 +230,7 @@ void GetRamp(
             pRealKernel[i] = pRamp[i].x / filterLen;
         }
         cudaMemcpyAsync(pcuRealKernel, pRealKernel, sizeof(cufftReal) * filterLen, cudaMemcpyHostToDevice, stream);
-    
-        cufftHandle planR2C;
+
         cufftPlan1d(&planR2C, filterLen, CUFFT_R2C, 1);
         cufftSetStream(planR2C, stream);
         cufftExecR2C(planR2C, pcuRealKernel, pcuFreqKernel);
