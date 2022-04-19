@@ -31,7 +31,7 @@ __global__ void Variation3DKernel(
 		return;
 	}
 
-	size_t ind = iz * nx * ny + iy * nx + iz;
+	size_t ind = iz * nx * ny + iy * nx + ix;
 	float x = img[ind];
 
 	float dx = 0;
@@ -79,7 +79,7 @@ __global__ void TVSQS3DKernel(
 		return;
 	}
 
-	size_t ind = iz * nx * ny + iy * nx + iz;
+	size_t ind = iz * nx * ny + iy * nx + ix;
 	float x = img[ind];
 	float v = var[ind];
 
@@ -141,7 +141,7 @@ __global__ void TVSQS3DKernel(
     dz1 *= wz;
 
 	s1[ind] = (dx0 + dy0 + dz0) / v + dx1 / varx + dy1 / vary + dz1 / varz;
-	s2[ind] = 3 / v + 1 / varx + 1 / vary + 1 / varz;
+	s2[ind] = (wx + wy + wz) / v + wx / varx + wy / vary + wz / varz;
 
 }
 

@@ -19,22 +19,25 @@ def sqs_one_step(
     projector_norm: float,
     beta: float,
     prior_func: Callable[..., Union[cp.array, Tuple[Any, ...]]],
+    prior_kwargs: dict,
+    acc_fac: float = 1,
+    fp_kwargs: dict = {},
+    bp_kwargs: dict = {},
     weight: cp.array = None,
     return_loss: bool = False,
-    **kwargs
 ):
     if weight is None:
         weight = 1
 
     # A.Tw(Ax)
-    fp = projector.fp(img) / projector_norm
+    fp = projector.fp(img, **fp_kwargs) / projector_norm
     fp = fp - prj / projector_norm
-    bp = projector.bp(fp * weight) / projector_norm
+    bp = projector.bp(fp * weight, **bp_kwargs) / projector_norm
 
     # sqs
-    kwargs['img'] = img
-    prior_res = prior_func(**kwargs)
-    img = img - (bp + beta * prior_res[0]) / (norm_img + beta * prior_res[1])
+    prior_kwargs['img'] = img
+    prior_res = prior_func(**prior_kwargs)
+    img = img - (bp * acc_fac + beta * prior_res[0]) / (norm_img + beta * prior_res[1])
 
     if return_loss:
         fp = projector.fp(img) / projector_norm
@@ -118,11 +121,11 @@ def sqs_gaussian_one_step(
 
 
 def nesterov_acceleration(
-    func: Callable[..., Union[cp.array, Tuple[Any, ...]]],
+    recon_func: Callable[..., Union[cp.array, Tuple[Any, ...]]],
+    recon_kwargs: dict,
     img: cp.array,
     img_nesterov: cp.array,
     nesterov: float = 0.5,
-    **kwargs
 ) -> Tuple[cp.array, cp.array]:
     '''
     kwargs should contains all params for func except for img.
@@ -152,14 +155,16 @@ def nesterov_acceleration(
         The nesterov image (x*) for the next iteration.
     '''
 
-    kwargs['img'] = img_nesterov
-    res = func(**kwargs)
+    recon_kwargs['img'] = img_nesterov
+    res = recon_func(**recon_kwargs)
 
     if type(res) is tuple:
         img_nesterov = res[0] + nesterov * (res[0] - img_nesterov)
         img = res[0]
+
+        return tuple([img, img_nesterov] + list(res[1:]))
     else:
         img_nesterov = res + nesterov * (res - img_nesterov)
         img = res
 
-    return img, img_nesterov
+        return img, img_nesterov
