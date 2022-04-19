@@ -16,6 +16,60 @@ module = cdll.LoadLibrary(
 
 
 # %%
+def ramp_filter(projector: ct_projector, prj: cp.array, filter_type: str = 'hann') -> cp.array:
+    '''
+    Filter the projection for parallel geometry.
+
+    Parameters
+    ---------------
+    projector: ct_projector.
+        The parameter wrapper.
+    prj: np.array(float32) of shape [batch, nview, nv, nu].
+        The projection to be filtered. The shape will override the default ones,
+        projector.nview, projector.nv, projector.nu.
+    filter_type: str.
+        Possible values are 'hamming', 'hann', 'cosine'. If not the above values,
+        will use RL filter.
+
+    Returns
+    --------------
+    fprj: np.array(float32) of shape [batch, nview, nv, nu].
+        The filtered projection.
+    '''
+    if filter_type.lower() == 'hamming':
+        ifilter = 1
+    elif filter_type.lower() == 'hann':
+        ifilter = 2
+    elif filter_type.lower() == 'cosine':
+        ifilter = 3
+    else:
+        ifilter = 0
+
+    fprj = cp.zeros(prj.shape, cp.float32)
+
+    module.cupyfbpParallelFilter.restype = c_int
+
+    err = module.cupyfbpParallelFilter(
+        c_void_p(fprj.data.ptr),
+        c_void_p(prj.data.ptr),
+        c_ulong(prj.shape[0]),
+        c_ulong(prj.shape[3]),
+        c_ulong(prj.shape[2]),
+        c_ulong(prj.shape[1]),
+        c_float(projector.du),
+        c_float(projector.dv),
+        c_float(projector.off_u),
+        c_float(projector.off_v),
+        c_int(ifilter)
+    )
+
+    if err != 0:
+        print(err)
+
+    return fprj
+
+
+# %%
 def distance_driven_fp(
     projector: ct_projector,
     img: cp.array,

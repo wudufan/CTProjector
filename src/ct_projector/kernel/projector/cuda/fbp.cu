@@ -161,6 +161,46 @@ void fbpFan::Filter(float* pcuFPrj, const float* pcuPrj)
 
 }
 
+
+extern "C" int cupyfbpFanFilter(
+    float* pFPrj,
+    const float* pPrj,
+    int nBatches, 
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float da,
+    float dv,
+    float off_a,
+    float off_v,
+    float dsd,
+    float dso,
+    int typeFilter = 0
+)
+{
+    fbpFan filter;
+    filter.Setup(
+        nBatches, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+        nu, nv, nview, da, dv, off_a, off_v, dsd, dso, typeFilter
+    );
+
+    try
+    {
+        cudaMemset(pFPrj, 0, sizeof(float) * nBatches * nu * nv * nview);
+        filter.Filter(pFPrj, pPrj);
+    }
+    catch (exception &e)
+    {
+        ostringstream oss;
+        oss << "cFilterFanFilter() failed: " << e.what()
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+        cerr << oss.str() << endl;
+    }
+
+    return cudaGetLastError();
+
+}
+
 extern "C" int cfbpFanFilter(
     float* pFPrj,
     const float* pPrj,
@@ -317,6 +357,54 @@ void fbpFan::Backprojection(float* pcuImg, const float* pcuPrj, const float* pcu
         cudaDeviceSynchronize();
 	}
 }
+
+
+extern "C" int cupyfbpFanBackprojection(
+    float* pImg,
+    const float* pPrj,
+    const float* pDeg,
+    size_t nBatches, 
+    size_t nx,
+    size_t ny,
+    size_t nz,
+    float dx,
+    float dy,
+    float dz,
+    float cx,
+    float cy,
+    float cz,
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float da,
+    float dv,
+    float off_a,
+    float off_v,
+    float dsd,
+    float dso
+)
+{
+    fbpFan projector;
+    projector.Setup(
+        nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+        nu, nv, nview, da, dv, off_a, off_v, dsd, dso
+    );
+
+    try
+    {
+        projector.Backprojection(pImg, pPrj, pDeg);
+    }
+    catch (exception &e)
+    {
+        ostringstream oss;
+        oss << "cfbpFanBackprojection() failed: " << e.what()
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+        cerr << oss.str() << endl;
+    }
+
+    return cudaGetLastError();
+}
+
 
 extern "C" int cfbpFanBackprojection(
     float* pImg,

@@ -106,6 +106,41 @@ void fbpParallel::Filter(float* pcuFPrj, const float* pcuPrj)
 	cudaFree(pcuFilter);
 }
 
+extern "C" int cupyfbpParallelFilter(
+    float* pFPrj,
+    const float* pPrj,
+    int nBatches, 
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float du,
+    float dv,
+    float off_u,
+    float off_v,
+	int typeFilter = 0
+) {
+    fbpParallel filter;
+	filter.Setup(
+        nBatches, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        nu, nv, nview, du, dv, off_u, off_v, 0, 0, typeFilter
+    );
+
+    try
+	{
+        cudaMemset(pFPrj, 0, sizeof(float) * nBatches * nu * nv * nview);
+		filter.Filter(pFPrj, pPrj);
+	}
+	catch (std::exception &e)
+	{
+		std::ostringstream oss;
+		oss << "cFilterParallelFilter() failed: " << e.what()
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+		std::cerr << oss.str() << std::endl;
+	}
+
+    return cudaGetLastError();
+}
+
 extern "C" int cfbpParallelFilter(
     float* pFPrj,
     const float* pPrj,
