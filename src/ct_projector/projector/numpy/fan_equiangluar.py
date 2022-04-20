@@ -241,7 +241,8 @@ def siddon_bp(projector: ct_projector, prj: np.array, angles: np.array) -> np.ar
 def distance_driven_fp(
     projector: ct_projector,
     img: np.array,
-    angles: np.array
+    angles: np.array,
+    branchless: Union[bool, int] = False
 ) -> np.array:
     '''
     Fanbeam forward projection with circular equiangular detector. Distance driven.
@@ -258,6 +259,10 @@ def distance_driven_fp(
     prj: array(float32) of size [batch, projector.nview, projector.nv, projector.nu]
         The forward projection.
     '''
+    type_projector = 0
+    if branchless:
+        type_projector += 2
+
     prj = np.zeros([img.shape[0], len(angles), projector.nv, projector.nu], np.float32)
 
     module.cDistanceDrivenFanProjection.restype = c_int
@@ -284,7 +289,8 @@ def distance_driven_fp(
         c_float(projector.off_u),
         c_float(projector.off_v),
         c_float(projector.dsd),
-        c_float(projector.dso)
+        c_float(projector.dso),
+        c_int(type_projector)
     )
 
     if err != 0:
@@ -297,7 +303,8 @@ def distance_driven_bp(
     projector: ct_projector,
     prj: np.array,
     angles: np.array,
-    is_fbp: Union[bool, int] = False
+    is_fbp: Union[bool, int] = False,
+    branchless: Union[bool, int] = False
 ) -> np.array:
     '''
     Fanbeam backprojection with circular equiangular detector. Distance driven.
@@ -317,12 +324,13 @@ def distance_driven_bp(
     img: cp.array(float32) of size [batch, projector.nz, projector.ny, projector.nx]
         The backprojected image.
     '''
+    type_projector = 0
+    if is_fbp:
+        type_projector += 1
+    if branchless:
+        type_projector += 2
 
     img = np.zeros([prj.shape[0], projector.nz, projector.ny, projector.nx], np.float32)
-    if is_fbp:
-        type_projector = 1
-    else:
-        type_projector = 0
 
     module.cDistanceDrivenFanBackprojection.restype = c_int
 

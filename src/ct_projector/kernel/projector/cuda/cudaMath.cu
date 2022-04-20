@@ -527,3 +527,76 @@ __device__ float IntegralBoxYZ(
 	return integral;
 
 }
+
+// Calculate the integral value inside a box in 2D
+// integral = (pixel sum) - (leftout)
+__device__ float IntegralBoxX(
+	const float* buff, float x1, float x2, const int iy, const int iz, size_t nx, size_t ny, size_t nz
+)
+{
+	x1 = ClampFloat(x1, 0, nx);
+	x2 = ClampFloat(x2, 0, nx);
+
+	int ix1 = Clamp(int(x1), 0, nx);
+	int ix2 = Clamp(int(x2), 0, nx);
+
+	// there is not area to integral on
+	if (x2 <= x1)
+	{
+		return 0;
+	}
+
+	float integral = 0;	
+
+	// 1. Calculate the integral of all the pixels
+	for (int ix = ix1; ix <= ix2; ix++)
+	{
+		integral += buff[iz * nx * ny + iy * nx + ix];
+	}
+
+	// 2. subtract the integral on the 2 sides 
+	// left
+	integral -= buff[iz * nx * ny + iy * nx + ix1] * (x1 - ix1);
+	// right
+	integral -= buff[iz * nx * ny + iy * nx + ix2] * (ix2 + 1 - x2);
+
+	return integral;
+
+}
+
+
+// Calculate the integral value inside a box in 2D
+// integral = (pixel sum) - (leftout)
+__device__ float IntegralBoxY(
+	const float* buff, float y1, float y2, const int ix, const int iz, size_t nx, size_t ny, size_t nz
+)
+{
+	y1 = ClampFloat(y1, 0, ny);
+	y2 = ClampFloat(y2, 0, ny);
+
+	int iy1 = Clamp(int(y1), 0, ny);
+	int iy2 = Clamp(int(y2), 0, ny);
+
+	// there is not area to integral on
+	if (y2 <= y1)
+	{
+		return 0;
+	}
+
+	float integral = 0;	
+
+	// 1. Calculate the integral of all the pixels
+	for (int iy = iy1; iy <= iy2; iy++)
+	{
+		integral += buff[iz * nx * ny + iy * nx + ix];
+	}
+
+	// 2. subtract the integral on the 2 sides 
+	// top
+	integral -= buff[iz * nx * ny + iy1 * nx + ix] * (y1 - iy1);
+	// bottom
+	integral -= buff[iz * nx * ny + iy2 * nx + ix] * (iy2 + 1 - y2);
+
+	return integral;
+
+}

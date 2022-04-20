@@ -30,9 +30,23 @@ public:
 	void AllocateExternal(float* pAccXEx, float* pAccYEx, float* pAccUEx, float* pWeightedPrjsEx);
 	void Free() override;
 
+	// mask typeProjector with the lazt digits: 0 - non FBP; 1 - FBP
+	bool isFBP();
+	// mask typeProjector with the second last disgits: 0 - box int; 1 - branchless
+	bool isBranchless();
+	// for example, typeProjector = 3 = 0b11, it will be branchless FBP
+
 public:
 	void Projection(const float* pcuImg, float* pcuPrj, const float* pcuDeg) override;
 	void Backprojection(float* pcuImg, const float* pcuPrj, const float* pcuDeg) override;
+
+public:
+	void ProjectionBranchless(const float* pcuImg, float* pcuPrj, const float* pcuDeg);
+	void BackprojectionBranchless(float* pcuImg, const float* pcuPrj, const float* pcuDeg);
+
+	void ProjectionBoxInt(const float* pcuImg, float* pcuPrj, const float* pcuDeg);
+	void BackprojectionBoxInt(float* pcuImg, const float* pcuPrj, const float* pcuDeg);
+
 };
 
 class DistanceDrivenParallel: public DistanceDrivenFan
@@ -48,6 +62,14 @@ public:
 public:
 	void Projection(const float* pcuImg, float* pcuPrj, const float* pcuDeg) override;
 	void Backprojection(float* pcuImg, const float* pcuPrj, const float* pcuDeg) override;
+
+public:
+	void ProjectionBranchless(const float* pcuImg, float* pcuPrj, const float* pcuDeg);
+	void BackprojectionBranchless(float* pcuImg, const float* pcuPrj, const float* pcuDeg);
+
+	void ProjectionBoxInt(const float* pcuImg, float* pcuPrj, const float* pcuDeg);
+	void BackprojectionBoxInt(float* pcuImg, const float* pcuPrj, const float* pcuDeg);
+
 };
 
 /*

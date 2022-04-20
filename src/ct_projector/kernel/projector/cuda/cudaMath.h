@@ -121,6 +121,10 @@ void GetThreadsForXZ(dim3 &threads, dim3 &blocks, int nx, int ny, int nz);
 
 void GetThreadsForXY(dim3 &threads, dim3 &blocks, int nx, int ny, int nz);
 
+// clamp x to range [start, end)
+__device__ int Clamp(int x, int start, int end);
+__device__ float ClampFloat(float x, float start, float end);
+
 // 2d interpolation to substitute texture
 __device__ double InterpolateXY(const double* buff, float x, float y, int iz, size_t nx, size_t ny, size_t nz);
 __device__ float InterpolateXY(const float* buff, float x, float y, int iz, size_t nx, size_t ny, size_t nz, bool truncate = false);
@@ -136,4 +140,12 @@ __device__ float IntegralBoxXZ(
 );
 __device__ float IntegralBoxYZ(
 	const float* buff, float y1, float z1, float y2, float z2, const int ix, size_t nx, size_t ny, size_t nz
+);
+
+// 1d integration inside a box
+__device__ float IntegralBoxX(
+	const float* buff, float x1, float x2, const int iy, const int iz, size_t nx, size_t ny, size_t nz
+);
+__device__ float IntegralBoxY(
+	const float* buff, float y1, float y2, const int ix, const int iz, size_t nx, size_t ny, size_t nz
 );
