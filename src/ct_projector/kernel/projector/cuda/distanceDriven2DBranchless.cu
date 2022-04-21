@@ -77,8 +77,8 @@ __device__ float DDFPTracing(
 		float r2 = (dst2.x - src2.x) / (dst2.y - src2.y);
 		for (int iy = 0; iy < grid.ny; iy++)
 		{
-			float x1 = src1.x + r1 * (iy - src1.y);
-			float x2 = src2.x + r2 * (iy - src2.y);
+			float x1 = src1.x + r1 * (iy + 0.5f - src1.y);
+			float x2 = src2.x + r2 * (iy + 0.5f - src2.y);
 
 			/*
 			The image coordinates has the corner of the first pixel as the (0,0,0);
@@ -111,8 +111,8 @@ __device__ float DDFPTracing(
 		float r2 = (dst2.y - src2.y) / (dst2.x - src2.x);
 		for (int ix = 0; ix < grid.nx; ix++)
 		{
-			float y1 = src1.y + r1 * (ix - src1.x);
-			float y2 = src2.y + r2 * (ix - src2.x);
+			float y1 = src1.y + r1 * (ix + 0.5f - src1.x);
+			float y2 = src2.y + r2 * (ix + 0.5f - src2.x);
 
 			// Please see DDFPFanKernelX for detailed explanation
 			val += (
@@ -398,13 +398,17 @@ __global__ void DDBPFanKernel(
 		return;
 	}
 
-	float x = (ix - (grid.nx - 1) / 2.0f) * grid.dx;
-	float x1 = x - grid.dx / 2.0f;
-	float x2 = x + grid.dx / 2.0f;
-	float y = (iy - (grid.ny - 1) / 2.0f) * grid.dy;
-	float y1 = y - grid.dy / 2.0f;
-	float y2 = y + grid.dy / 2.0f;
-	float iv = (iz - (grid.nz - 1) / 2.0f) * grid.dz / det.dv + det.off_v + (det.nv - 1.0f) / 2.f;
+	float3 dst = ImgToPhysics(make_float3(ix, iy, iz), grid);
+
+	dst.x += 0.5f;
+	dst.y += 0.5f;
+	dst.z += 0.5f;
+
+	float x1 = dst.x - grid.dx / 2.0f;
+	float x2 = dst.x + grid.dx / 2.0f;
+	float y1 = dst.y - grid.dy / 2.0f;
+	float y2 = dst.y + grid.dy / 2.0f;
+	float iv = dst.z / det.dv + det.off_v + det.nv / 2.f - 0.5f;
 
 	for (int iview = 0; iview < nview; iview++)
 	{
@@ -418,13 +422,13 @@ __global__ void DDBPFanKernel(
 		float a1, a2;
 		if (fabsf(cosDeg) > fabsf(sinDeg))
 		{
-			a1 = GetProjectionOnDetector(x1, y, dsd, dso, cosDeg, sinDeg);
-			a2 = GetProjectionOnDetector(x2, y, dsd, dso, cosDeg, sinDeg);
+			a1 = GetProjectionOnDetector(x1, dst.y, dsd, dso, cosDeg, sinDeg);
+			a2 = GetProjectionOnDetector(x2, dst.y, dsd, dso, cosDeg, sinDeg);
 		}
 		else
 		{
-			a1 = GetProjectionOnDetector(x, y1, dsd, dso, cosDeg, sinDeg);
-			a2 = GetProjectionOnDetector(x, y2, dsd, dso, cosDeg, sinDeg);
+			a1 = GetProjectionOnDetector(dst.x, y1, dsd, dso, cosDeg, sinDeg);
+			a2 = GetProjectionOnDetector(dst.x, y2, dsd, dso, cosDeg, sinDeg);
 		}
 		a1 = -(a1 / det.du + det.off_u) + det.nu / 2.0f;
 		a2 = -(a2 / det.du + det.off_u) + det.nu / 2.0f;
@@ -444,7 +448,7 @@ __global__ void DDBPFanKernel(
 
 		if (isFBP)
 		{
-			pImg[iz * grid.nx * grid.ny + iy * grid.nx + ix] += val * GetFBPWeight(x, y, dsd, dso, cosDeg, sinDeg);
+			pImg[iz * grid.nx * grid.ny + iy * grid.nx + ix] += val * GetFBPWeight(dst.x, dst.y, dsd, dso, cosDeg, sinDeg);
 		}
 		else
 		{
@@ -484,13 +488,17 @@ __global__ void DDBPParallelKernel(
 		return;
 	}
 
-	float x = (ix - (grid.nx - 1) / 2.0f) * grid.dx;
-	float x1 = x - grid.dx / 2.0f;
-	float x2 = x + grid.dx / 2.0f;
-	float y = (iy - (grid.ny - 1) / 2.0f) * grid.dy;
-	float y1 = y - grid.dy / 2.0f;
-	float y2 = y + grid.dy / 2.0f;
-	float iv = (iz - (grid.nz - 1) / 2.0f) * grid.dz / det.dv + det.off_v + (det.nv - 1.0f) / 2.f;
+	float3 dst = ImgToPhysics(make_float3(ix, iy, iz), grid);
+
+	dst.x += 0.5f;
+	dst.y += 0.5f;
+	dst.z += 0.5f;
+
+	float x1 = dst.x - grid.dx / 2.0f;
+	float x2 = dst.x + grid.dx / 2.0f;
+	float y1 = dst.y - grid.dy / 2.0f;
+	float y2 = dst.y + grid.dy / 2.0f;
+	float iv = dst.z / det.dv + det.off_v + det.nv / 2.f - 0.5f;
 
 	for (int iview = 0; iview < nview; iview++)
 	{
@@ -504,13 +512,13 @@ __global__ void DDBPParallelKernel(
 		float u1, u2;
 		if (fabsf(cosDeg) > fabsf(sinDeg))
 		{
-			u1 = GetProjectionOnDetectorParallel(x1, y, cosDeg, sinDeg);
-			u2 = GetProjectionOnDetectorParallel(x2, y, cosDeg, sinDeg);
+			u1 = GetProjectionOnDetectorParallel(x1, dst.y, cosDeg, sinDeg);
+			u2 = GetProjectionOnDetectorParallel(x2, dst.y, cosDeg, sinDeg);
 		}
 		else
 		{
-			u1 = GetProjectionOnDetectorParallel(x, y1, cosDeg, sinDeg);
-			u2 = GetProjectionOnDetectorParallel(x, y2, cosDeg, sinDeg);
+			u1 = GetProjectionOnDetectorParallel(dst.x, y1, cosDeg, sinDeg);
+			u2 = GetProjectionOnDetectorParallel(dst.x, y2, cosDeg, sinDeg);
 		}
 		u1 = -(u1 / det.du + det.off_u) + det.nu / 2.0f;
 		u2 = -(u2 / det.du + det.off_u) + det.nu / 2.0f;
@@ -536,7 +544,7 @@ __global__ void DDBPParallelKernel(
 
 void DistanceDrivenFan::BackprojectionBranchless(float* pcuImg, const float* pcuPrj, const float* pcuDeg)
 {
-	bool isFBP = (typeProjector == 1);
+	bool fbp = isFBP();
 
 	try
 	{
@@ -550,7 +558,7 @@ void DistanceDrivenFan::BackprojectionBranchless(float* pcuImg, const float* pcu
 
 			// pre-weight for iterative BP to make it conjugate to FP
 			dim3 threadsDet, blocksDet;
-			if (!isFBP) // not FBP
+			if (!fbp) // not FBP
 			{
 				GetThreadsForXZ(threadsDet, blocksDet, nu, nv, nview);
 				PreweightBPKernel<<<blocksDet, threadsDet, 0, m_stream>>>(pWeightedPrjs, pcuDeg, nview, det, grid.dx, grid.dy);
@@ -566,7 +574,7 @@ void DistanceDrivenFan::BackprojectionBranchless(float* pcuImg, const float* pcu
 			// step 2: backprojection
 			dim3 threads, blocks;
 			GetThreadsForXY(threads, blocks, nx, ny, nz);
-			DDBPFanKernel<<<blocks, threads, 0, m_stream>>>(pcuImg + ib * nx * ny * nz, pAccU, pcuDeg, nview, grid, det, dsd, dso, isFBP);
+			DDBPFanKernel<<<blocks, threads, 0, m_stream>>>(pcuImg + ib * nx * ny * nz, pAccU, pcuDeg, nview, grid, det, dsd, dso, fbp);
 			cudaStreamSynchronize(m_stream);
 		}
 	}
@@ -583,7 +591,7 @@ void DistanceDrivenFan::BackprojectionBranchless(float* pcuImg, const float* pcu
 
 void DistanceDrivenParallel::BackprojectionBranchless(float* pcuImg, const float* pcuPrj, const float* pcuDeg)
 {
-	bool isFBP = (typeProjector == 1);
+	bool fbp = isFBP();
 
 	try
 	{
@@ -597,7 +605,7 @@ void DistanceDrivenParallel::BackprojectionBranchless(float* pcuImg, const float
 
 			// pre-weight for iterative BP to make it conjugate to FP
 			dim3 threadsDet, blocksDet;
-			if (!isFBP) // not FBP
+			if (!fbp) // not FBP
 			{
 				GetThreadsForXZ(threadsDet, blocksDet, nu, nv, nview);
 				PreweightBPParallelKernel<<<blocksDet, threadsDet, 0, m_stream>>>(pWeightedPrjs, pcuDeg, nview, det, grid.dx, grid.dy);

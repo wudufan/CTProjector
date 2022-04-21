@@ -15,6 +15,8 @@ It should have better precision.
 
 using namespace std;
 
+const float ddMargin = 0.12; // cos(40 deg) - sin(40 deg) = 0.123
+
 // Trace the distance driven forward projection
 __device__ float DDFPTracing(
 	const float* pImg,
@@ -39,17 +41,18 @@ __device__ float DDFPTracing(
 
     float wz = z - iz;
 
-	float val = 0;
-	// calculate the intersection with at each y
-	if (fabsf(cosDeg) > fabsf(sinDeg))
+	float valx = 0;
+	float valy = 0;
+
+	// Trace along y
+	if (fabsf(cosDeg) > fabsf(sinDeg) - ddMargin)
 	{
-		// calculate the intersection with at each y
 		float r1 = (dst1.x - src1.x) / (dst1.y - src1.y);
 		float r2 = (dst2.x - src2.x) / (dst2.y - src2.y);
 		for (int iy = 0; iy < grid.ny; iy++)
 		{
-			float x1 = src1.x + r1 * (iy - src1.y);
-			float x2 = src2.x + r2 * (iy - src2.y);
+			float x1 = src1.x + r1 * (iy + 0.5f - src1.y);
+			float x2 = src2.x + r2 * (iy + 0.5f - src2.y);
 
 			if (x1 > x2) {
 				float t = x1;
@@ -57,24 +60,26 @@ __device__ float DDFPTracing(
 				x2 = t;
 			}
 
-			val += (
+			valx += (
                 IntegralBoxX(pImg, x1, x2, iy, iz, grid.nx, grid.ny, grid.nz) * (1 - wz)
                 + IntegralBoxX(pImg, x1, x2, iy, iz1, grid.nx, grid.ny, grid.nz) * wz
             ) / (x2 - x1);
 		}
 
 		// normalize by length
-		val *= grid.dy / fabsf(__cosf(deg - a));
+		valx *= grid.dy / fabsf(__cosf(deg - a));
 	}
-	else
+
+	// Trace along x
+	if (fabsf(cosDeg) < fabsf(sinDeg) + ddMargin)
 	{
 		// calculate the intersection with at each x
 		float r1 = (dst1.y - src1.y) / (dst1.x - src1.x);
 		float r2 = (dst2.y - src2.y) / (dst2.x - src2.x);
 		for (int ix = 0; ix < grid.nx; ix++)
 		{
-			float y1 = src1.y + r1 * (ix - src1.x);
-			float y2 = src2.y + r2 * (ix - src2.x);
+			float y1 = src1.y + r1 * (ix + 0.5f - src1.x);
+			float y2 = src2.y + r2 * (ix + 0.5f - src2.x);
 
 			if (y1 > y2) {
 				float t = y1;
@@ -82,17 +87,22 @@ __device__ float DDFPTracing(
 				y2 = t;
 			}
 
-			val += (
+			valy += (
 				IntegralBoxY(pImg, y1, y2, ix, iz, grid.nx, grid.ny, grid.nz) * (1 - wz)
                 + IntegralBoxY(pImg, y1, y2, ix, iz1, grid.nx, grid.ny, grid.nz) * wz
 			) / (y2 - y1);
 		}
 
 		// normalize by length
-		val *= grid.dx / fabsf(__sinf(deg - a));
+		valy *= grid.dx / fabsf(__sinf(deg - a));
 	}
 
-	return val;
+	// weighting between val_x and val_y
+	float diffDeg = fabsf(cosDeg) - fabsf(sinDeg);
+	float wx = (diffDeg + ddMargin) / (2 * ddMargin);
+	wx = ClampFloat(wx, 0, 1);
+
+	return valx * wx + valy * (1 - wx);
 }
 
 
@@ -130,8 +140,8 @@ __global__ void DDFPParallelKernel(
 
 	float cosDeg = __cosf(deg);
 	float sinDeg = __sinf(deg);
-	float u = (-(iu - (det.nu-1) / 2.0f) - det.off_u) * det.du;
-	float z = (iv - (det.nv-1) / 2.0f + det.off_v) * det.dv;
+	float u = (-(iu - (det.nu - 1) / 2.0f) - det.off_u) * det.du;
+	float z = (iv - (det.nv - 1) / 2.0f + det.off_v) * det.dv;
 
 	// a virtual dso to put the src and dst
 	float dso = grid.nx * grid.dx + grid.ny * grid.dy;
@@ -320,13 +330,17 @@ __global__ void DDBPFanKernel(
 		return;
 	}
 
-	float x = (ix - (grid.nx - 1) / 2.0f) * grid.dx;
-	float x1 = x - grid.dx / 2.0f;
-	float x2 = x + grid.dx / 2.0f;
-	float y = (iy - (grid.ny - 1) / 2.0f) * grid.dy;
-	float y1 = y - grid.dy / 2.0f;
-	float y2 = y + grid.dy / 2.0f;
-	float iv = (iz - (grid.nz - 1) / 2.0f) * grid.dz / det.dv + det.off_v + (det.nv - 1.0f) / 2.f;
+	float3 dst = ImgToPhysics(make_float3(ix, iy, iz), grid);
+
+	dst.x += 0.5f;
+	dst.y += 0.5f;
+	dst.z += 0.5f;
+
+	float x1 = dst.x - grid.dx / 2.0f;
+	float x2 = dst.x + grid.dx / 2.0f;
+	float y1 = dst.y - grid.dy / 2.0f;
+	float y2 = dst.y + grid.dy / 2.0f;
+	float iv = dst.z / det.dv + det.off_v + det.nv / 2.f - 0.5f;
 
 	for (int iview = 0; iview < nview; iview++)
 	{
@@ -340,13 +354,13 @@ __global__ void DDBPFanKernel(
 		float a1, a2;
 		if (fabsf(cosDeg) > fabsf(sinDeg))
 		{
-			a1 = GetProjectionOnDetector(x1, y, dsd, dso, cosDeg, sinDeg);
-			a2 = GetProjectionOnDetector(x2, y, dsd, dso, cosDeg, sinDeg);
+			a1 = GetProjectionOnDetector(x1, dst.y, dsd, dso, cosDeg, sinDeg);
+			a2 = GetProjectionOnDetector(x2, dst.y, dsd, dso, cosDeg, sinDeg);
 		}
 		else
 		{
-			a1 = GetProjectionOnDetector(x, y1, dsd, dso, cosDeg, sinDeg);
-			a2 = GetProjectionOnDetector(x, y2, dsd, dso, cosDeg, sinDeg);
+			a1 = GetProjectionOnDetector(dst.x, y1, dsd, dso, cosDeg, sinDeg);
+			a2 = GetProjectionOnDetector(dst.x, y2, dsd, dso, cosDeg, sinDeg);
 		}
 		a1 = -(a1 / det.du + det.off_u) + det.nu / 2.0f;
 		a2 = -(a2 / det.du + det.off_u) + det.nu / 2.0f;
@@ -363,7 +377,7 @@ __global__ void DDBPFanKernel(
 
 		if (isFBP)
 		{
-			pImg[iz * grid.nx * grid.ny + iy * grid.nx + ix] += val * GetFBPWeight(x, y, dsd, dso, cosDeg, sinDeg);
+			pImg[iz * grid.nx * grid.ny + iy * grid.nx + ix] += val * GetFBPWeight(dst.x, dst.y, dsd, dso, cosDeg, sinDeg);
 		}
 		else
 		{
@@ -403,13 +417,17 @@ __global__ void DDBPParallelKernel(
 		return;
 	}
 
-	float x = (ix - (grid.nx - 1) / 2.0f) * grid.dx;
-	float x1 = x - grid.dx / 2.0f;
-	float x2 = x + grid.dx / 2.0f;
-	float y = (iy - (grid.ny - 1) / 2.0f) * grid.dy;
-	float y1 = y - grid.dy / 2.0f;
-	float y2 = y + grid.dy / 2.0f;
-	float iv = (iz - (grid.nz - 1) / 2.0f) * grid.dz / det.dv + det.off_v + (det.nv - 1.0f) / 2.f;
+	float3 dst = ImgToPhysics(make_float3(ix, iy, iz), grid);
+
+	dst.x += 0.5f;
+	dst.y += 0.5f;
+	dst.z += 0.5f;
+
+	float x1 = dst.x - grid.dx / 2.0f;
+	float x2 = dst.x + grid.dx / 2.0f;
+	float y1 = dst.y - grid.dy / 2.0f;
+	float y2 = dst.y + grid.dy / 2.0f;
+	float iv = dst.z / det.dv + det.off_v + det.nv / 2.f - 0.5f;
 
 	for (int iview = 0; iview < nview; iview++)
 	{
@@ -421,28 +439,49 @@ __global__ void DDBPParallelKernel(
 		// For the u direction, the origin is the border of pixel 0
 		// u1 and u2 are directly corresponding to the pixel-center coordinates of the accumulated pAcc
 		float u1, u2;
-		if (fabsf(cosDeg) > fabsf(sinDeg))
+		float valx = 0;
+		float valy = 0;
+		if (fabsf(cosDeg) > fabsf(sinDeg) - ddMargin)
 		{
-			u1 = GetProjectionOnDetectorParallel(x1, y, cosDeg, sinDeg);
-			u2 = GetProjectionOnDetectorParallel(x2, y, cosDeg, sinDeg);
-		}
-		else
-		{
-			u1 = GetProjectionOnDetectorParallel(x, y1, cosDeg, sinDeg);
-			u2 = GetProjectionOnDetectorParallel(x, y2, cosDeg, sinDeg);
-		}
-		u1 = -(u1 / det.du + det.off_u) + det.nu / 2.0f;
-		u2 = -(u2 / det.du + det.off_u) + det.nu / 2.0f;
+			u1 = GetProjectionOnDetectorParallel(x1, dst.y, cosDeg, sinDeg);
+			u2 = GetProjectionOnDetectorParallel(x2, dst.y, cosDeg, sinDeg);
 
-		// make sure a1 < a2
-		if (u1 > u2)
-		{
-			float t = u1;
-			u1 = u2;
-			u2 = t;
+			u1 = -(u1 / det.du + det.off_u) + det.nu / 2.0f;
+			u2 = -(u2 / det.du + det.off_u) + det.nu / 2.0f;
+
+			// make sure a1 < a2
+			if (u1 > u2) {
+				float t = u1;
+				u1 = u2;
+				u2 = t;
+			}
+
+			valx = IntegralBoxX(pPrj, u1, u2, iv, iview, det.nu, det.nv, nview) / (u2 - u1);
 		}
 
-		float val = IntegralBoxX(pPrj, u1, u2, iv, iview, det.nu, det.nv, nview) / (u2 - u1);
+		if (fabsf(cosDeg) < fabsf(sinDeg) + ddMargin)
+		{
+			u1 = GetProjectionOnDetectorParallel(dst.x, y1, cosDeg, sinDeg);
+			u2 = GetProjectionOnDetectorParallel(dst.x, y2, cosDeg, sinDeg);
+
+			u1 = -(u1 / det.du + det.off_u) + det.nu / 2.0f;
+			u2 = -(u2 / det.du + det.off_u) + det.nu / 2.0f;
+
+			// make sure a1 < a2
+			if (u1 > u2) {
+				float t = u1;
+				u1 = u2;
+				u2 = t;
+			}
+
+			valy = IntegralBoxX(pPrj, u1, u2, iv, iview, det.nu, det.nv, nview) / (u2 - u1);
+		}
+
+		// weighting between valx and valy
+		float diffDeg = fabsf(cosDeg) - fabsf(sinDeg);
+		float wx = (diffDeg + ddMargin) / (2 * ddMargin);
+		wx = ClampFloat(wx, 0, 1);
+		float val = valx * wx + valy * (1 - wx);
 
 		pImg[iz * grid.nx * grid.ny + iy * grid.nx + ix] += val;
 
@@ -477,7 +516,7 @@ void DistanceDrivenFan::BackprojectionBoxInt(float* pcuImg, const float* pcuPrj,
 			dim3 threads, blocks;
 			GetThreadsForXY(threads, blocks, nx, ny, nz);
 			DDBPFanKernel<<<blocks, threads, 0, m_stream>>>(
-				pcuImg + ib * nx * ny * nz, pcuPrj + ib * nu * nv * nview, pcuDeg, nview, grid, det, dsd, dso, fbp
+				pcuImg + ib * nx * ny * nz, pWeightedPrjs, pcuDeg, nview, grid, det, dsd, dso, fbp
 			);
 			cudaStreamSynchronize(m_stream);
 		}
@@ -520,7 +559,7 @@ void DistanceDrivenParallel::BackprojectionBoxInt(float* pcuImg, const float* pc
 			dim3 threads, blocks;
 			GetThreadsForXY(threads, blocks, nx, ny, nz);
 			DDBPParallelKernel<<<blocks, threads, 0, m_stream>>>(
-				pcuImg + ib * nx * ny * nz, pcuPrj + ib * nu * nv * nview, pcuDeg, nview, grid, det
+				pcuImg + ib * nx * ny * nz, pWeightedPrjs, pcuDeg, nview, grid, det
 			);
 			cudaStreamSynchronize(m_stream);
 		}
