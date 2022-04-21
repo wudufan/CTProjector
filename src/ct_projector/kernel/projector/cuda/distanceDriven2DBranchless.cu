@@ -400,9 +400,9 @@ __global__ void DDBPFanKernel(
 
 	float3 dst = ImgToPhysics(make_float3(ix, iy, iz), grid);
 
-	dst.x += 0.5f;
-	dst.y += 0.5f;
-	dst.z += 0.5f;
+	dst.x += grid.dx / 2;
+	dst.y += grid.dy / 2;
+	dst.z += grid.dz / 2;
 
 	float x1 = dst.x - grid.dx / 2.0f;
 	float x2 = dst.x + grid.dx / 2.0f;
@@ -490,9 +490,9 @@ __global__ void DDBPParallelKernel(
 
 	float3 dst = ImgToPhysics(make_float3(ix, iy, iz), grid);
 
-	dst.x += 0.5f;
-	dst.y += 0.5f;
-	dst.z += 0.5f;
+	dst.x += grid.dx / 2;
+	dst.y += grid.dy / 2;
+	dst.z += grid.dz / 2;
 
 	float x1 = dst.x - grid.dx / 2.0f;
 	float x2 = dst.x + grid.dx / 2.0f;
