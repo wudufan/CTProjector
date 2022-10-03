@@ -1,3 +1,3 @@
 #!/bin/bash
 
-sudo docker build -t ct_projector:0.3.0 .
+sudo docker build -t ct_projector:0.5.1 .

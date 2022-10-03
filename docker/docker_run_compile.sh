@@ -8,4 +8,4 @@ export CONTAINER_WORKDIR="/workspace/ct_projector"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 
-docker-compose run compile "/env/compile.sh"
+docker compose run compile "/env/compile.sh"
