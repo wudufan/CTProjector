@@ -273,12 +273,19 @@ void DistanceDrivenParallel::ProjectionBoxInt(const float* pcuImg, float* pcuPrj
 
 		for (int ib = 0; ib < nBatches; ib++)
 		{		
-			dim3 threadDet, blockDet;
-			GetThreadsForXZ(threadDet, blockDet, nu, nv, nview);
-			DDFPParallelKernel<<<blockDet, threadDet, 0, m_stream>>>(
+			dim3 threadsDet, blocksDet;
+			GetThreadsForXZ(threadsDet, blocksDet, nu, nv, nview);
+			DDFPParallelKernel<<<blocksDet, threadsDet, 0, m_stream>>>(
 				pcuPrj + ib * nu * nv * nview, pcuImg + ib * nx * ny * nz, pcuDeg, nview, grid, det
 			);
 			cudaStreamSynchronize(m_stream);
+
+			if (forceFBPWeight()) {
+				// cancel the raw-length weighting
+				GetThreadsForXZ(threadsDet, blocksDet, nu, nv, nview);
+				ReverseWeightBPParallelKernel<<<blocksDet, threadsDet, 0, m_stream>>>(pcuPrj, pcuDeg, nview, det, grid.dx, grid.dy);
+				cudaStreamSynchronize(m_stream);
+			}
 		}
 	}
 	catch (exception &e)
@@ -491,7 +498,7 @@ __global__ void DDBPParallelKernel(
 
 void DistanceDrivenFan::BackprojectionBoxInt(float* pcuImg, const float* pcuPrj, const float* pcuDeg)
 {
-	bool fbp = isFBP();
+	bool fbp = (isFBP() || forceFBPWeight());
 
 	try
 	{
@@ -534,7 +541,7 @@ void DistanceDrivenFan::BackprojectionBoxInt(float* pcuImg, const float* pcuPrj,
 
 void DistanceDrivenParallel::BackprojectionBoxInt(float* pcuImg, const float* pcuPrj, const float* pcuDeg)
 {
-	bool fbp = isFBP();
+	bool fbp = (isFBP() || forceFBPWeight());
 
 	try
 	{

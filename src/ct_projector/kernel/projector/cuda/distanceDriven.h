@@ -30,10 +30,17 @@ public:
 	void AllocateExternal(float* pAccXEx, float* pAccYEx, float* pAccUEx, float* pWeightedPrjsEx);
 	void Free() override;
 
-	// mask typeProjector with the lazt digits: 0 - non FBP; 1 - FBP
+	// mask typeProjector with the last digit: 0 - non FBP; 1 - FBP
 	bool isFBP();
-	// mask typeProjector with the second last disgits: 0 - box int; 1 - branchless
+
+	// mask typeProjector with the second last digit: 0 - box int; 1 - branchless
 	bool isBranchless();
+
+	// mask typeProjector with the third last digit: 0 - normal;
+	// 1 - FBP weight scheme will be applied to both forward and backprojections.
+	// This is useful for tensorflow operations, where the gradient is realized by conjugate operators.
+	bool forceFBPWeight();
+
 	// for example, typeProjector = 3 = 0b11, it will be branchless FBP
 
 public:

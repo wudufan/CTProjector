@@ -64,6 +64,35 @@ __global__ void PreweightBPParallelKernel(
 		
 }
 
+// Cancel the ray-length weighting during forward projection
+__global__ void ReverseWeightBPParallelKernel(
+	float* pPrjs, const float* pDeg, size_t nview, const Detector det, float dx, float dy
+)
+{
+	int iu = blockIdx.x * blockDim.x + threadIdx.x;
+	int iv = blockIdx.y * blockDim.y + threadIdx.y;
+	int iview = blockIdx.z * blockDim.z + threadIdx.z;
+
+	if (iu >= det.nu || iv >= det.nv || iview >= nview)
+	{
+		return;
+	}
+
+	float deg = pDeg[iview];
+
+	if (fabsf(__cosf(deg)) > fabsf(__sinf(deg)))
+	{
+		// Y as main axis
+		pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] /= dy / fabsf(__cosf(deg));
+	}
+	else
+	{
+		//X as main axis
+		pPrjs[iview * det.nu * det.nv + iv * det.nu + iu] /= dx / fabsf(__sinf(deg));
+	}
+		
+}
+
 __device__ float GetProjectionOnDetector(float x, float y, float dsd, float dso, float cosDeg, float sinDeg)
 {
 	float rx =  x * cosDeg + y * sinDeg;

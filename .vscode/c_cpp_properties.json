@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/src/ct_projector/kernel/**",
                 "${workspaceFolder}/src/ct_projector/kernel/projector/cuda",
-                "/home/local/PARTNERS/dw640/miniconda3/envs/dbt_dev/lib/python3.7/site-packages/tensorflow_core/include"
+                "/usr/local/lib/python3.8/dist-packages/tensorflow/include",
+                "/usr/local/cuda/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

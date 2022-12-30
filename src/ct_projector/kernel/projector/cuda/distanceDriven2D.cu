@@ -19,6 +19,10 @@ bool DistanceDrivenFan::isBranchless() {
 	return (typeProjectorMasked == 2);
 }
 
+bool DistanceDrivenFan::forceFBPWeight() {
+	int typeProjectorMasked = typeProjector & 4;
+	return (typeProjectorMasked == 4);
+}
 
 void DistanceDrivenFan::Allocate(bool forward, bool backward)
 {
