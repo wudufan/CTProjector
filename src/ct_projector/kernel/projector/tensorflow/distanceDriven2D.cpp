@@ -142,8 +142,8 @@ public:
         OP_REQUIRES_OK(context, context->GetAttr("type_projector", &typeProjector));
         OP_REQUIRES(
             context,
-            typeProjector == 0 || typeProjector == 3,
-            errors::InvalidArgument("type_projector must be 0 (IR) or 3 (FBP weight)")
+            typeProjector == 0 || typeProjector == 4,
+            errors::InvalidArgument("type_projector must be 0 (IR) or 4 (force FBP weight)")
         );
     }
 
@@ -367,8 +367,8 @@ public:
         OP_REQUIRES_OK(context, context->GetAttr("type_projector", &typeProjector));
         OP_REQUIRES(
             context,
-            typeProjector == 0 || typeProjector == 3,
-            errors::InvalidArgument("type_projector must be 0 (IR) or 3 (FBP weight)")
+            typeProjector == 0 || typeProjector == 4,
+            errors::InvalidArgument("type_projector must be 0 (IR) or 4 (force FBP weight)")
         );
     }
 
