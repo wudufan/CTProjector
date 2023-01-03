@@ -43,7 +43,7 @@ def distance_driven_2d_fp(
     detector: tf.Tensor = None,
     output_shape: tf.Tensor = None,
     default_shape: List[int] = None,
-    type_geometry: TypeGeometry = TypeGeometry.FAN_EQUIANGULAR,
+    type_geometry: TypeGeometry = TypeGeometry.PARALLEL,
     type_projector: int = TypeProjector.IR,
     name: str = None
 ) -> tf.Tensor:
@@ -248,7 +248,7 @@ class DistanceDriven2DFP(tf.keras.layers.Layer):
         self,
         projector: ct_projector,
         angles: tf.Tensor = None,
-        type_geometry: TypeGeometry = TypeGeometry.FAN_EQUIANGULAR,
+        type_geometry: TypeGeometry = TypeGeometry.PARALLEL,
         type_projector: int = TypeProjector.IR,
         default_shape: List[int] = None,
         name: str = ''
@@ -295,7 +295,7 @@ def distance_driven_2d_bp(
     detector: tf.Tensor = None,
     output_shape: tf.Tensor = None,
     default_shape: List[int] = None,
-    type_geometry: TypeGeometry = TypeGeometry.FAN_EQUIANGULAR,
+    type_geometry: TypeGeometry = TypeGeometry.PARALLEL,
     type_projector: int = TypeProjector.IR,
     name: str = None
 ) -> tf.Tensor:
@@ -500,7 +500,7 @@ class DistanceDriven2DBP(tf.keras.layers.Layer):
         self,
         projector: ct_projector,
         angles: tf.Tensor = None,
-        type_geometry: TypeGeometry = TypeGeometry.FAN_EQUIANGULAR,
+        type_geometry: TypeGeometry = TypeGeometry.PARALLEL,
         type_projector: int = TypeProjector.IR,
         default_shape: List[int] = None,
         name: str = ''

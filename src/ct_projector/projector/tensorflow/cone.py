@@ -54,7 +54,7 @@ def siddon_fp_arbitrary(
 
     Parameters
     ----------------
-    img: Tensor of shape [batch, nx, ny, nz, channel], float32.
+    img: Tensor of shape [batch, nz, ny, nx, channel], float32.
         The image to be projected.
     geometry: Tensor of shape [batch, nview * 4, 3], float32.
         It is the stack of det_center, det_u, det_v, and src vectors.
@@ -72,7 +72,7 @@ def siddon_fp_arbitrary(
 
     Returns
     ----------------
-    prj: Tensor of shape [batch, nu, nv, nview, channel], float32.
+    prj: Tensor of shape [batch, nview, nv, nu, channel], float32.
         The forward projection.
     '''
     batchsize = tf.shape(img)[0]
@@ -93,7 +93,7 @@ def siddon_fp_arbitrary(
     output_shape = tile_tensor(output_shape, batchsize)
 
     # (batch, channel, nz, ny, nx)
-    img = tf.transpose(img, (0, 4, 3, 2, 1))
+    img = tf.transpose(img, (0, 4, 1, 2, 3))
 
     prj = module.siddon_cone_fp(
         image=img,
@@ -107,7 +107,7 @@ def siddon_fp_arbitrary(
 
     # reshape it back
     # (batch, nu, nv, nview, channel)
-    prj = tf.transpose(prj, (0, 4, 3, 2, 1))
+    prj = tf.transpose(prj, (0, 2, 3, 4, 1))
 
     return prj
 
@@ -126,7 +126,7 @@ def siddon_bp_arbitrary(
     Conebeam backprojection with arbitrary geometry and flat panel. Using Siddon ray tracing.
     Parameters
     ----------------
-    prj: Tensor of shape [batch, nu, nv, nview, channel], float32.
+    prj: Tensor of shape [batch, nview, nv, nu, channel], float32.
         The projection to be backprojected.
     geometry: Tensor of shape [batch, nview * 4, 3], float32.
         It is the stack of det_center, det_u, det_v, and src vectors.
@@ -144,7 +144,7 @@ def siddon_bp_arbitrary(
 
     Returns
     ----------------
-    img: Tensor of shape [batch, nx, ny, nz, channel], float32.
+    img: Tensor of shape [batch, nz, ny, nx, channel], float32.
         The backprojected image.
     '''
     batchsize = tf.shape(prj)[0]
@@ -166,7 +166,7 @@ def siddon_bp_arbitrary(
 
     # reshape the img tensor for input
     # (batch, channel, nview, nv, nu)
-    prj = tf.transpose(prj, (0, 4, 3, 2, 1))
+    prj = tf.transpose(prj, (0, 4, 1, 2, 3))
 
     img = module.siddon_cone_bp(
         projection=prj,
@@ -180,7 +180,7 @@ def siddon_bp_arbitrary(
 
     # reshape it back
     # (batch, nx, ny, nz, channel)
-    img = tf.transpose(img, (0, 4, 3, 2, 1))
+    img = tf.transpose(img, (0, 2, 3, 4, 1))
 
     return img
 
@@ -295,7 +295,7 @@ class SiddonFPArbitrary(tf.keras.layers.Layer):
     Call Parameters
     ------------------
     Mandatory:
-    inputs: Tensor of shape [batch, nx, ny, nz, channel], float32.
+    inputs: Tensor of shape [batch, nz, ny, nx, channel], float32.
         It is the image to be forward projected.
     geometry: Tensor of shape [batch, nview * 4, 3], float 32.
         Different geometries can be set to different elements in one batch.
@@ -326,7 +326,7 @@ class SiddonFPArbitrary(tf.keras.layers.Layer):
 
     Returns
     ------------------
-    prj: Tensor of shape [batch, nu, nv, nview, channel], float32.
+    prj: Tensor of shape [batch, nview, nv, nu, channel], float32.
         The forward projection.
 
     '''
