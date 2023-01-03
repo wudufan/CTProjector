@@ -50,6 +50,14 @@ def get_ramp_filter(
         w = np.pi * np.sin(k[inds] * du)
     ramp[inds] = -1 / (w * w)
 
+    # apply additional window
+    if type_filter == TypeFilter.HANN:
+        window_freq = 0.5 + 0.5 * np.cos(2 * np.pi * np.arange(filter_len) / filter_len)
+    else:
+        window_freq = np.ones([filter_len])
+    ramp_freq = np.fft.fft(ramp) * window_freq
+    ramp = np.fft.ifft(ramp_freq).real
+
     return ramp
 
 

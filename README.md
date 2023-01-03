@@ -108,6 +108,8 @@ numpy | helical_equiangular_parallel_rebin | helical parallel rebin/BP | Conebea
 Module | Name | Detector | Trajectory | Algorithm | Comments 
 ---- | ---- | ---- | ---- | ---- | ---- 
 cone | SiddonFP(BP)Arbitrary | Conebeam flat panel | Arbitrary | Siddon | None
+circular_2d | DistanceDriven2DFP(BP) | Parallel beam | Circular | Distance driven | see ex_fp_bp_dd_tf.ipynb
+filters | ProjectionFilter | Parallel beam | Circular | RL, Hann | see ex_fp_bp_dd_tf.ipynb
 
 ### Priors
 
