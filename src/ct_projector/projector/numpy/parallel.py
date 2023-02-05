@@ -72,6 +72,64 @@ def ramp_filter(projector: ct_projector, prj: np.array, filter_type: str = 'hann
 
 
 # %%
+def pixel_driven_bp(
+    projector: ct_projector,
+    prj: np.array,
+    angles: np.array,
+) -> np.array:
+    '''
+    Parallel backprojection. Pixel driven.
+
+    Parameters
+    ----------------
+    prj: array(float32) of size [batch, nview, nv, nu].
+        The projection to be backprojected. The size does not need to be the same
+        with projector.nview, projector.nv, projector.nu.
+    angles: array(float32) of size [nview].
+        The projection angles in radius.
+
+    Returns
+    --------------
+    img: array(float32) of size [batch, projector.nz, projector.ny, projector.nx]
+        The backprojected image.
+    '''
+    type_projector = 0
+
+    img = np.zeros([prj.shape[0], projector.nz, projector.ny, projector.nx], np.float32)
+
+    module.cfbpParallelBackprojection.restype = c_int
+
+    err = module.cfbpParallelBackprojection(
+        img.ctypes.data_as(POINTER(c_float)),
+        prj.ctypes.data_as(POINTER(c_float)),
+        angles.ctypes.data_as(POINTER(c_float)),
+        c_ulong(img.shape[0]),
+        c_ulong(img.shape[3]),
+        c_ulong(img.shape[2]),
+        c_ulong(img.shape[1]),
+        c_float(projector.dx),
+        c_float(projector.dy),
+        c_float(projector.dz),
+        c_float(projector.cx),
+        c_float(projector.cy),
+        c_float(projector.cz),
+        c_ulong(prj.shape[3]),
+        c_ulong(prj.shape[2]),
+        c_ulong(prj.shape[1]),
+        c_float(projector.du),
+        c_float(projector.dv),
+        c_float(projector.off_u),
+        c_float(projector.off_v),
+        c_int(type_projector)
+    )
+
+    if err != 0:
+        print(err)
+
+    return img
+
+
+# %%
 def distance_driven_fp(
     projector: ct_projector,
     img: np.array,

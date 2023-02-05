@@ -25,6 +25,7 @@ public:
 
 public:
 	void Filter(float* pcuFPrj, const float* pcuPrj);
+	void Backprojection(float* pcuImg, const float* pcuPrj, const float* pcuDeg) override;
 };
 
 

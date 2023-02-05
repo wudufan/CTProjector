@@ -8,6 +8,8 @@
 #include <sstream>
 #include <iostream>
 
+using namespace std;
+
 
 void fbpParallel::Filter(float* pcuFPrj, const float* pcuPrj)
 {
@@ -193,4 +195,150 @@ extern "C" int cfbpParallelFilter(
 
     return cudaGetLastError();
 
+}
+
+const static int nzBatch = 5;
+__global__ void bpParallelKernel3D(
+    float* pImg,
+    const float* prj,
+    const float* pDeg,
+    size_t nview,
+    const Grid grid,
+    const Detector det
+)
+{
+	int ix = blockIdx.x * blockDim.x + threadIdx.x;
+	int iy = blockIdx.y * blockDim.y + threadIdx.y;
+	int izBatch = blockIdx.z * blockDim.z + threadIdx.z;
+
+	if (ix >= grid.nx || iy >= grid.ny || izBatch * nzBatch >= grid.nz)
+	{
+		return;
+	}
+
+    // the image coordinates here has the lower left corner of the first pixel defined as (0,0,0)
+    // because (ix,iy,iz) are based on the centers of the pixels, so an offset of 0.5 should be added. 
+    register float3 pt = ImgToPhysics(make_float3(ix + 0.5f, iy + 0.5f, izBatch * nzBatch + 0.5f), grid);
+
+	register float val[nzBatch] = {0};
+	register float cosDeg, sinDeg, pu, pv;
+	for (int iview = 0; iview < nview; iview++)
+	{
+		cosDeg = __cosf(pDeg[iview]);
+		sinDeg = __sinf(pDeg[iview]);
+		pu =  pt.x * cosDeg + pt.y * sinDeg;
+
+		pu = -(pu / det.du + det.off_u) + (det.nu - 1.0f) / 2.0f;
+
+#pragma unroll
+		for (int iz = 0; iz < nzBatch; iz++)
+		{
+			pv = (pt.z + iz * grid.dz) / det.dv + det.off_v + (det.nv - 1.0f) / 2.f;
+
+            val[iz] += InterpolateXY(prj, pu, pv, iview, det.nu, det.nv, nview, true);
+		}
+
+	}
+#pragma unroll
+	for (int iz = 0; iz < nzBatch; iz++)
+	{
+		if (iz + izBatch * nzBatch < grid.nz)
+		{
+			pImg[(iz + izBatch * nzBatch) * grid.nx * grid.ny + iy * grid.nx + ix] += val[iz];
+		}
+	}
+
+}
+
+void fbpParallel::Backprojection(float* pcuImg, const float* pcuPrj, const float* pcuDeg)
+{
+    dim3 threads(32, 16, 1);
+	dim3 blocks(ceilf(nx / (float)threads.x), ceilf(ny / (float)threads.y), ceilf(nz / (float)nzBatch));
+
+	for (int ib = 0; ib < nBatches; ib++)
+	{
+        bpParallelKernel3D<<<blocks, threads, 0, m_stream>>>(
+            pcuImg + ib * nx * ny * nz,
+            pcuPrj + ib * nu * nv * nview,
+            pcuDeg, 
+            nview,
+            MakeGrid(nx, ny, nz, dx, dy, dz, cx, cy, cz),
+            MakeDetector(nu, nv, du, dv, off_u, off_v)
+        );
+        cudaDeviceSynchronize();
+	}
+}
+
+
+extern "C" int cfbpParallelBackprojection(
+    float* pImg,
+    const float* pPrj,
+    const float* pDeg,
+    size_t nBatches, 
+    size_t nx,
+    size_t ny,
+    size_t nz,
+    float dx,
+    float dy,
+    float dz,
+    float cx,
+    float cy,
+    float cz,
+    size_t nu,
+    size_t nv,
+    size_t nview,
+    float du,
+    float dv,
+    float off_u,
+    float off_v,
+    int typeProjector = 0
+)
+{
+    fbpParallel projector;
+    projector.Setup(
+        nBatches, nx, ny, nz, dx, dy, dz, cx, cy, cz,
+        nu, nv, nview, du, dv, off_u, off_v, 1000, 500, typeProjector
+    );
+
+    float* pcuImg = NULL;
+    float* pcuPrj = NULL;
+    float* pcuDeg = NULL;
+    try
+    {
+        if (cudaSuccess != cudaMalloc(&pcuImg, sizeof(float) * nBatches * nx * ny * nz))
+        {
+            throw runtime_error("pcuImg allocation failed");
+        }
+
+        if (cudaSuccess != cudaMalloc(&pcuPrj, sizeof(float) * nBatches * nu * nview * nv))
+        {
+            throw runtime_error("pcuPrj allocation failed");
+        }
+
+        if (cudaSuccess != cudaMalloc(&pcuDeg, sizeof(float) * nview))
+        {
+            throw runtime_error("pcuDeg allocation failed");
+        }
+
+        cudaMemcpy(pcuPrj, pPrj, sizeof(float) * nBatches * nu * nview * nv, cudaMemcpyHostToDevice);
+        cudaMemcpy(pcuDeg, pDeg, sizeof(float) * nview, cudaMemcpyHostToDevice);
+        cudaMemset(pcuImg, 0, sizeof(float) * nBatches * nx * ny * nz);
+
+        projector.Backprojection(pcuImg, pcuPrj, pcuDeg);
+        cudaMemcpy(pImg, pcuImg, sizeof(float) * nBatches * nx * ny * nz, cudaMemcpyDeviceToHost);
+
+    }
+    catch (exception &e)
+    {
+        ostringstream oss;
+        oss << "cfbpParallelBackprojection() failed: " << e.what()
+            << "(" << cudaGetErrorString(cudaGetLastError()) << ")";
+        cerr << oss.str() << endl;
+    }
+
+    if (pcuImg != NULL) cudaFree(pcuImg);
+    if (pcuPrj != NULL) cudaFree(pcuPrj);
+    if (pcuDeg != NULL) cudaFree(pcuDeg);
+
+    return cudaGetLastError();
 }
