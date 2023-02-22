@@ -155,16 +155,16 @@ def nesterov_acceleration(
         The nesterov image (x*) for the next iteration.
     '''
 
-    recon_kwargs['img'] = img_nesterov
+    recon_kwargs['img'] = img
     res = recon_func(**recon_kwargs)
 
     if type(res) is tuple:
-        img_nesterov = res[0] + nesterov * (res[0] - img_nesterov)
-        img = res[0]
+        img = res[0] + nesterov * (res[0] - img_nesterov)
+        img_nesterov = res[0]
 
         return tuple([img, img_nesterov] + list(res[1:]))
     else:
-        img_nesterov = res + nesterov * (res - img_nesterov)
-        img = res
+        img = res + nesterov * (res - img_nesterov)
+        img_nesterov = res
 
         return img, img_nesterov
