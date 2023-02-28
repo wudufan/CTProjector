@@ -232,7 +232,7 @@ void DistanceDrivenTomo::BackprojectionTomoBoxInt(
 
 		// step 0: preweight the projections for ray intersection length
 		dim3 threadUV(32, 16, 1);
-		dim3 blockUV(ceilf(nu / 32.f), ceilf(nv / 16.f), 1);
+		dim3 blockUV(ceilf(nu / 32.f), ceilf(nv / 16.f), nview);
 		cudaMemcpy(pcuWeightedPrjs, pcuPrj, sizeof(float) * nBatches * nu * nv * nview, cudaMemcpyDeviceToDevice);
 		for (int ib = 0; ib < nBatches; ib++)
 		{
