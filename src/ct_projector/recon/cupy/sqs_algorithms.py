@@ -5,18 +5,18 @@ Unified numpy as cupy through importing.
 '''
 
 from typing import Union, Tuple, Callable, Any
-from ct_projector.recon import get_backend
+from . import BACKEND
 
-if get_backend() == 'cupy':
+if BACKEND == 'cupy':
     import cupy as cp
     import ct_projector.prior.cupy as recon_prior
     from ct_projector.projector.cupy import ct_projector
-elif get_backend() == 'numpy':
+elif BACKEND == 'numpy':
     import numpy as cp
     import ct_projector.prior.numpy as recon_prior
     from ct_projector.projector.numpy import ct_projector
 else:
-    raise ValueError('Backend not supported.', get_backend())
+    raise ValueError('Backend not supported.', BACKEND)
 
 
 def sqs_one_step(
