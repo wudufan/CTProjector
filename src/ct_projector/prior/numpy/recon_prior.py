@@ -158,3 +158,56 @@ def hypr_nlm(
         print(err)
 
     return res
+
+
+def tv_sqs(
+    img: np.array,
+    weights: Tuple[float, float, float],
+    eps: float = 1e-8
+):
+    '''
+    The TV prior for SQS algorithm.
+
+    Parameters
+    -----------------
+    img: np.array(float32) of shape [batch, nz, ny, nx].
+        The image to be calculated for TV prior.
+    weights: tuple of length 3.
+        The weighting factor along z, y, x.
+    eps: float.
+        The normalization at x = 0.
+
+    Returns
+    ------------------
+    s1: np.array(float32) of shape [batch, nz, ny, nx].
+        The first-order derivative of the prior.
+    s2: np.array(float32) of shape [batch, nz, ny, nx].
+        The second-order derivative of the prior.
+    var: np.array(float32) of shape [batch, nz, ny, nx].
+        The variation map.
+    '''
+
+    module.cTVSQS3D.restype = c_int
+    s1 = np.zeros(img.shape, np.float32)
+    s2 = np.zeros(img.shape, np.float32)
+    var = np.zeros(img.shape, np.float32)
+
+    err = module.cTVSQS3D(
+        s1.ctypes.data_as(POINTER(c_float)),
+        s2.ctypes.data_as(POINTER(c_float)),
+        var.ctypes.data_as(POINTER(c_float)),
+        img.ctypes.data_as(POINTER(c_float)),
+        c_float(weights[2]),
+        c_float(weights[1]),
+        c_float(weights[0]),
+        c_ulong(img.shape[0]),
+        c_ulong(img.shape[3]),
+        c_ulong(img.shape[2]),
+        c_ulong(img.shape[1]),
+        c_float(eps)
+    )
+
+    if not err == 0:
+        print(err)
+
+    return s1, s2, var

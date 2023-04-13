@@ -154,7 +154,7 @@ class ct_projector:
         else:
             weight = 1
 
-        x = np.random.uniform(size=[1, self.nz, self.ny, self.nx], dtype=np.float32)
+        x = np.random.uniform(size=[1, self.nz, self.ny, self.nx]).astype(np.float32)
         x = x / np.linalg.norm(x)
 
         for i in range(niter):

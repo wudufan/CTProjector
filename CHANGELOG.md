@@ -1,3 +1,9 @@
+# v0.8.0 04/12/2022
+
+## MAJOR UPDATE
+
+- Added numpy routine for the `recon` module; The `recon` module realized code reuse between the numpy as cupy version through the `BACKEND` variable in the `__init__.py` in the module.
+
 # v0.7.2 02/27/2023
 
 ## MAJOR BUG FIX

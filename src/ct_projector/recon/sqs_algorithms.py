@@ -1,14 +1,22 @@
 '''
 This file provide general utilities in sqs algorithm using generic forward and backprojector.
 
-Change all the cupy to numpy should be able to change it to numpy version.
+Unified numpy as cupy through importing.
 '''
 
 from typing import Union, Tuple, Callable, Any
+from ct_projector.recon import get_backend
 
-import cupy as cp
-import ct_projector.prior.cupy as recon_prior
-from ct_projector.projector.cupy import ct_projector
+if get_backend() == 'cupy':
+    import cupy as cp
+    import ct_projector.prior.cupy as recon_prior
+    from ct_projector.projector.cupy import ct_projector
+elif get_backend() == 'numpy':
+    import numpy as cp
+    import ct_projector.prior.numpy as recon_prior
+    from ct_projector.projector.numpy import ct_projector
+else:
+    raise ValueError('Backend not supported.', get_backend())
 
 
 def sqs_one_step(

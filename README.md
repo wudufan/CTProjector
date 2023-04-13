@@ -122,4 +122,4 @@ cupy, numpy | nlm | (Guided) Non-local mean | Gaussian | SQS | Needed component 
 
 Cupy/Numpy | Name | Comments
 ---- | ---- | ----
-cupy | sqs_gaussian | 
+cupy, numpy | sqs_gaussian | 
