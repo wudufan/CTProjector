@@ -61,9 +61,12 @@ def nlm(
     kernel = gaussian_filter(kernel, kernel_std)
 
     res = np.zeros(img.shape, np.float32)
-    img = img.astype(np.float32)
-    guide = guide.astype(np.float32)
-    kernel = kernel.astype(np.float32)
+    if img.dtype != np.float32:
+        img = img.astype(np.float32)
+    if guide.dtype != np.float32:
+        guide = guide.astype(np.float32)
+    if kernel.dtype != np.float32:
+        kernel = kernel.astype(np.float32)
 
     module.cNlm.restype = c_int
     err = module.cNlm(
