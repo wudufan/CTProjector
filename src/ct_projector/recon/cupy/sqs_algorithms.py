@@ -101,7 +101,8 @@ def sqs_gaussian_one_step(
         Only return if return_loss is True. The penalty term loss.
     '''
     def gaussian_func(img):
-        return recon_prior.nlm(img, cp.ones(img.shape, cp.float32), 1, [3, 3, 3], [1, 1, 1], 1)
+        guide = cp.ones(img.shape, cp.float32)
+        return recon_prior.nlm(img, guide, 1, [3, 3, 3], [1, 1, 1], 1)
 
     if weight is None:
         weight = 1
