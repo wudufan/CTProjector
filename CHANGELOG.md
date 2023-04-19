@@ -1,3 +1,9 @@
+# v0.8.4 04/19/2023
+
+## UPDATE
+
+- Add example for gaussian penalized iterative reconstruction `ex_recon_gaussian_cupy.ipynb`.
+
 # v0.8.0 04/12/2022
 
 ## MAJOR UPDATE

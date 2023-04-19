@@ -44,5 +44,8 @@ Where `(nv, nu)` is the detector size in pixels. `(dv, du)` is the pixel size in
 ### ex_fp_bp
 Example on arbitrary cone beam projection and backprojection with flat panel detector and Siddon algorithm. Corresponding to `siddon_fp(bp)_arbitrary`.
 
-### ex_tv_recon
-Example on TV penalized reconstruction. One should consider using the nlm module to realize Gaussian prior function which will have a closer appearance to FBP.
+### ex_recon_tv
+Example on TV penalized reconstruction. 
+
+### ex_recon_gaussian
+Example on L2 penalized reconstruction. It has a closer appearance to FBP and is preferred for normal-dose, fully-sampled reconstruction. Note that the reconstruction wrappers from `ct_projector.recon` are just python wrappers and can be easily changed to any reconstruction algorithms that only requires forward and backprojections.
