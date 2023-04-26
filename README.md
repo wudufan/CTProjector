@@ -1,7 +1,7 @@
 # CT Projection and Reconstruction Package
 
 ## Version information
-CUDA 11.0, Tensorflow-gpu 2.4.1 (pip installed)
+CUDA 11.2, Tensorflow-gpu 2.11.0
 
 Please check the tags for other pre-built versions.
 

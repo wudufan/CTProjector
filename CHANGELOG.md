@@ -1,3 +1,10 @@
+# v0.8.4.cu112 04/26/2023
+
+## UPDATE
+
+- Build docker with tf 2.11 and cuda 11.2
+- Change tf compiler option to std=c++14
+
 # v0.8.4 04/19/2023
 
 ## UPDATE

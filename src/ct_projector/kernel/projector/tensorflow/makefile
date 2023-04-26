@@ -32,7 +32,7 @@ ${SHARED_TARGET}: ${OBJECTS}
 #compile
 ${OUT}/%.o: %.cpp
 	nvcc -E ${CFLAGS} ${TF_CFLAGS} --compiler-options '-MM -MF $(patsubst %.o,%.d,$@) -MT $@ -MP' $<
-	nvcc -c -O3 ${CFLAGS} ${TF_CFLAGS} --compiler-options "-fPIC -std=c++11" $< -o $@
+	nvcc -c -O3 ${CFLAGS} ${TF_CFLAGS} --compiler-options "-fPIC -std=c++14" $< -o $@
 
 clean: 
 	-rm -f ${OBJECTS} ${SHARED_TARGET} ${DEPENDS}
