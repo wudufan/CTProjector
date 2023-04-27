@@ -251,7 +251,7 @@ class DistanceDriven2DFP(tf.keras.layers.Layer):
         type_geometry: TypeGeometry = TypeGeometry.PARALLEL,
         type_projector: int = TypeProjector.IR,
         default_shape: List[int] = None,
-        name: str = ''
+        name: str = None
     ):
         super(DistanceDriven2DFP, self).__init__(name=name)
         self.projector = projector
@@ -503,7 +503,7 @@ class DistanceDriven2DBP(tf.keras.layers.Layer):
         type_geometry: TypeGeometry = TypeGeometry.PARALLEL,
         type_projector: int = TypeProjector.IR,
         default_shape: List[int] = None,
-        name: str = ''
+        name: str = None
     ):
         super(DistanceDriven2DBP, self).__init__(name=name)
         self.projector = projector

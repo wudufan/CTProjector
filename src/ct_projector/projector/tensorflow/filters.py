@@ -71,7 +71,7 @@ class ProjectionFilter(tf.keras.layers.Layer):
         du: float,
         type_geometry: TypeGeometry = TypeGeometry.PARALLEL,
         type_filter: TypeFilter = TypeFilter.RL,
-        name: str = ''
+        name: str = None
     ):
         super(ProjectionFilter, self).__init__(name=name)
         self.du = du

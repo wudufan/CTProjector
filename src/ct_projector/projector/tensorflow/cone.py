@@ -334,7 +334,7 @@ class SiddonFPArbitrary(tf.keras.layers.Layer):
         self,
         projector: ct_projector,
         default_shape: List[int] = None,
-        name: str = ''
+        name: str = None
     ):
         super(SiddonFPArbitrary, self).__init__(name=name)
         self.projector = projector
@@ -371,7 +371,7 @@ class SiddonBPArbitrary(tf.keras.layers.Layer):
         self,
         projector: ct_projector,
         default_shape: List[int] = None,
-        name: str = ''
+        name: str = None
     ):
         super(SiddonBPArbitrary, self).__init__(name=name)
         self.projector = projector

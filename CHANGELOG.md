@@ -4,6 +4,7 @@
 
 - Build docker with tf 2.11 and cuda 11.2
 - Change tf compiler option to std=c++14
+- fix tensorflow op name bug
 
 # v0.8.4 04/19/2023
 
