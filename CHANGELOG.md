@@ -1,3 +1,13 @@
+# new version
+
+## UPDATE
+
+- Switch to cu112 on the main branch
+
+## BUG FIX
+
+- Fix the ordered subset in `example/ex_recon_gaussian_cupy.ipynb`.
+
 # v0.8.4.cu112 04/26/2023
 
 ## UPDATE
